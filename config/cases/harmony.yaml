@@ -1,0 +1,43 @@
+case_id: harmony
+name: Harmony Horizon Bridge Hack
+date: 2022-06-23
+chain: ethereum
+description: >
+  ~$100M drained from Harmony's Horizon Bridge (Ethereum side). Attributed to the
+  Lazarus Group by the FBI (press release, 23 Jan 2023). Funds were swapped to ETH,
+  routed through Tornado Cash (June 2022), and later moved via Railgun and
+  cross-chain bridges (Jan 2023).
+
+attribution: Lazarus Group (DPRK) - FBI, 23 Jan 2023
+references:
+  - "FBI press release (23 Jan 2023): FBI Confirms Lazarus Group Cyber Actors Responsible for Harmony's Horizon Bridge Currency Theft"
+  - "Harmony Protocol incident updates on the Horizon Bridge exploit (June 2022)"
+
+# Reference USD prices on the incident date, used to value transfers in the dashboard.
+# ETH cross-checked against the attacker's own swap rate in the data
+# (41.2M USDC + 5.53M BUSD + 43 WETH -> 41,562 ETH  =>  ~$1,125 per ETH).
+prices_usd:
+  ETH: 1125
+  WETH: 1125
+  WBTC: 21000
+  USDC: 1
+  USDT: 1
+  DAI: 1
+  BUSD: 1
+  FRAX: 1
+
+# Seed address(es) where tracing starts.
+# Verified from on-chain data: received 13,100 ETH, 41.2M USDC, 592 WBTC, ... on 23 Jun 2022.
+seeds:
+  - "0x0d043128146654c7683fbf30ac98d7b2285ded00"
+
+# Start tracing from this block/time onward (just before the exploit).
+start_time: 2022-06-23T00:00:00Z
+
+# Ground truth for Phase 7 validation (fill from the FBI release / public reports).
+ground_truth: data/ground_truth/harmony.csv
+
+# Optional per-case overrides of config/settings.yaml
+overrides:
+  tracing:
+    max_hops: 6

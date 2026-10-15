@@ -1,0 +1,85 @@
+# Global settings. Every number here is a tunable research parameter:
+# change it, re-run `cryptotrace analyze`, and the sensitivity analysis
+# in the report shows how much the conclusions move.
+
+etherscan:
+  # Etherscan API V2 (V1 was retired in 2025). One key works for all chains.
+  base_url: https://api.etherscan.io/v2/api
+  chain_id: 1                 # Ethereum mainnet
+  rate_limit_per_sec: 4       # free tier allows 5/s; stay under it
+  page_size: 10000            # max rows per call; a full page => high-activity address
+
+storage:
+  db_path: data/cryptotrace.db
+
+tracing:
+  max_hops: 6                 # stop expanding beyond this distance from the seed
+  max_addresses: 400          # hard cap on addresses fetched per case
+  only_follow_after_receipt: true   # ignore outflows that happened before tainted funds arrived
+  # Addresses whose first page is full are treated as unlabeled services
+  # (likely exchange / contract) and are not expanded.
+  service_tx_count_threshold: 10000
+  # Unlisted addresses whose verified Etherscan contract name contains one of these
+  # are auto-labeled as DEX (pools / pairs / routers) and not expanded.
+  dex_contract_patterns: [UniswapV2Pair, UniswapV3Pool, SushiSwap, Curve, Balancer, SwapRouter,
+                          AggregationRouter, "0x: Exchange", PancakeV3Pool]
+  # Only these ERC-20 contracts are followed. This removes spam / address-poisoning
+  # tokens, which otherwise explode the graph. Add tokens relevant to your case.
+  token_allowlist:
+    "0xdac17f958d2ee523a2206206994597c13d831ec7": USDT
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": USDC
+    "0x6b175474e89094c44da98b954eedeac495271d0f": DAI
+    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": WETH
+    "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": WBTC
+    "0x4fabb145d64652a948d72533023f6e7a623c7c53": BUSD
+    "0x853d955acef822db058eb8505911ed77f175b99e": FRAX
+  # Minimum transfer size to follow, per token symbol (dust filter).
+  min_value:
+    ETH: 0.05
+    WETH: 0.05
+    WBTC: 0.002
+    USDT: 100
+    USDC: 100
+    DAI: 100
+    BUSD: 100
+    FRAX: 100
+    default: 0
+
+scoring:
+  # Per-hop multiplicative confidence factors. Path confidence = product of
+  # factors along the best path from the seed (max-product path).
+  hop_factors:
+    direct: 0.92            # sender has a single recipient in the window
+    split: 0.80             # sender pays 2..(fan_out_min_recipients-1) recipients
+    fan_out: 0.60           # sender pays >= fan_out_min_recipients recipients
+    swap: 0.90              # sent to a DEX router/pool (asset converts, owner unchanged)
+    exchange_deposit: 0.30  # custodial: ownership after deposit is unknowable on-chain
+    bridge: 0.25            # leaves the chain (cross-chain out of scope)
+    mixer: 0.05             # Tornado Cash etc.
+  # Fan-in adjustment applied to the receiving wallet:
+  #   factor = fan_in_floor + (1 - fan_in_floor) * taint_ratio(receiver)
+  # All-tainted consolidation => no penalty; mixing with clean funds => penalty.
+  fan_in_floor: 0.60
+  # Confidence bands (lower bound, inclusive), mapping back to the proposal's labels.
+  bands:
+    very_high: 0.90
+    high: 0.75
+    medium: 0.55
+    lower: 0.35
+    low: 0.15
+    very_low: 0.0
+
+patterns:
+  window_hours: 24            # time window for fan-out / fan-in
+  split_min_recipients: 2
+  fan_out_min_recipients: 5
+  fan_in_min_senders: 3
+  peeling_min_length: 4       # wallets in a chain
+  peeling_main_share: 0.70    # forwarded share of outflow that counts as the "main" branch
+  rapid_max_gap_minutes: 30   # wallet forwards funds within this long of receiving them
+  circular_max_length: 6
+
+validation:
+  sensitivity_runs: 50
+  sensitivity_perturbation: 0.10   # +/-10% on every hop factor
+  random_seed: 42

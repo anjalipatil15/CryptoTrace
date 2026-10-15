@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cryptotrace"
+version = "0.1.0"
+description = "CryptoTrace: confidence-based forensic tracing of stolen cryptocurrency"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "networkx>=3.2",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+rpc = ["web3>=6.15"]
+dev = ["pytest>=8.0", "jupyter>=1.0"]
+
+[project.scripts]
+cryptotrace = "cryptotrace.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cryptotrace = ["dashboard/template.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

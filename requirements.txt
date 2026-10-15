@@ -1,0 +1,8 @@
+# Mirrors pyproject.toml; prefer `pip install -e .[dev]`
+requests>=2.31
+pandas>=2.1
+numpy>=1.26
+networkx>=3.2
+pyyaml>=6.0
+python-dotenv>=1.0
+pytest>=8.0

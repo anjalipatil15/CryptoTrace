@@ -1,0 +1,24 @@
+case_id: nomad
+name: Nomad Bridge Hack
+date: 2022-08-01
+chain: ethereum
+description: >
+  ~$190M drained by hundreds of independent "copycat" exploiters reusing the same
+  bad transaction. Useful as a fan-out / attribution-ambiguity dataset, and as the
+  CALIBRATION case for tuning scoring weights (keep Harmony held out for evaluation).
+
+attribution: Hundreds of independent exploiters
+# Approximate prices on 1 Aug 2022 -- verify (e.g. cross-check against swap rates in the data).
+prices_usd: {ETH: 1650, WETH: 1650, WBTC: 23000, USDC: 1, USDT: 1, DAI: 1, FRAX: 1}
+
+# Many seeds: populate from Nomad's published exploit data (exploiter addresses and
+# white-hat return lists). Leave empty until sourced -- do not guess addresses.
+seeds: []
+
+start_time: 2022-08-01T00:00:00Z
+ground_truth: data/ground_truth/nomad.csv
+
+overrides:
+  tracing:
+    max_hops: 3
+    max_addresses: 2000
