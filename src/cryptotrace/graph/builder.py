@@ -13,8 +13,14 @@ def build_graph(transfers: pd.DataFrame, labels: LabelStore, nodes: pd.DataFrame
     g = nx.MultiDiGraph()
     if nodes is not None and not nodes.empty:
         # Keep the tracer's decisions (dust, tokens, limits): only transfers INTO traced addresses.
-        # Inflows from outside wallets stay, since taint needs the clean money too.
-        transfers = transfers[transfers["to_addr"].isin(set(nodes["address"]))]
+        # Wallets the trace followed keep inflows from outside too, since taint needs the clean money.
+        # Endpoints (busy services, limit nodes) keep only inflows from the trail: their full
+        # histories can run to millions of unrelated transfers.
+        traced = set(nodes["address"])
+        followed = set(nodes.loc[nodes["status"] == "expanded", "address"])
+        to_followed = transfers["to_addr"].isin(followed)
+        from_trail = transfers["to_addr"].isin(traced) & transfers["from_addr"].isin(traced)
+        transfers = transfers[to_followed | from_trail]
     for row in transfers.itertuples(index=False):
         g.add_edge(
             row.from_addr,

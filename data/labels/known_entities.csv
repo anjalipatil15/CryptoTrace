@@ -9,3 +9,7 @@ address,entity,category,source
 0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45,Uniswap V3 SwapRouter02,dex,Etherscan label - verify
 0x28c6c06298d514db089934071355e5743bf21d60,Binance 14,exchange,Etherscan label - verify
 0x21a31ee1afc51d94c2efccaa2092ad1028285549,Binance 15,exchange,Etherscan label - verify
+0x94a84433101a10aeda762968f6995c574d1bf154,Nomad Recovery (custody: Anchorage Digital),recovery,Nomad official announcement (Aug 2022) as reported by BankInfoSecurity / ForkLog - verify on Etherscan
+0xb92336759618f55bd0f8313bd843604592e27bd8,Nomad Replica (exploited contract),bridge,rekt.news Nomad Bridge - REKT (Aug 2022) - verify on Etherscan
+0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7,Curve 3pool (DAI/USDC/USDT),dex,Etherscan label (verified name is generic Vyper_contract) - verify
+0xd632f22692fac7611d2aa1c0d552930d43caed3b,Curve FRAX3CRV metapool,dex,Etherscan label (verified name is generic Vyper_contract) - verify

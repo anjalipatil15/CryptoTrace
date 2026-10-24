@@ -28,7 +28,7 @@ cryptotrace = "cryptotrace.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-cryptotrace = ["dashboard/template.html"]
+cryptotrace = ["dashboard/template.html", "dashboard/presentation.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

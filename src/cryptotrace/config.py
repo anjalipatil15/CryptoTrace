@@ -53,10 +53,16 @@ def load_case(path: str | Path, settings_path: str | Path = DEFAULT_SETTINGS) ->
     settings = _deep_merge(load_settings(settings_path), raw.get("overrides") or {})
     start = raw.get("start_time")
     gt = raw.get("ground_truth")
+    seeds = [s.lower() for s in raw.get("seeds") or []]
+    if src := raw.get("seeds_from"):
+        # Seeds listed in a CSV (address, usd, ...), optionally only those above a value threshold.
+        df = pd.read_csv(PROJECT_ROOT / src["file"], dtype={"address": str})
+        df = df[df["usd"] >= src.get("min_usd", 0)]
+        seeds += [a.lower() for a in df["address"] if a.lower() not in seeds]
     return Case(
         case_id=raw["case_id"],
         name=raw.get("name", raw["case_id"]),
-        seeds=[s.lower() for s in raw.get("seeds") or []],
+        seeds=seeds,
         start_time=_utc(start) if start else None,
         ground_truth=(PROJECT_ROOT / gt) if gt else None,
         settings=settings,

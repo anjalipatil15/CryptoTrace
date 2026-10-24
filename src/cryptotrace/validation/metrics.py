@@ -1,7 +1,8 @@
 """Phase 7 - validation against public investigations, and robustness of the scores.
 
 Ground-truth CSV columns: address, role, path_id, step, source
-  * address / role / source  -- addresses named by the FBI, Chainalysis, TRM, court docs
+  * address / role / source  -- addresses named by the FBI, Chainalysis, TRM, court docs;
+                                roles starting "post_mixer" are out of trace scope
   * path_id / step (optional) -- an ordered, publicly documented path, for completeness
 
 Public reports list *some* attacker wallets, never all of them, so precision
@@ -18,6 +19,10 @@ import numpy as np
 import pandas as pd
 
 from .._compat import spearman
+from ..scoring.taint import propagate_taint
+
+# Ground-truth roles starting with this prefix are wallets reached only through a mixer.
+POST_MIXER_PREFIX = "post_mixer"
 
 
 def load_ground_truth(path: str | Path | None) -> pd.DataFrame:
@@ -32,12 +37,23 @@ def wallet_identification(scored: pd.DataFrame, gt: pd.DataFrame) -> dict:
     traced = set(scored["address"]) if not scored.empty else set()
     truth = set(gt["address"])
     hit = traced & truth
+    # Wallets reached only after funds leave a mixer are beyond the trace horizon by design
+    # (tracing stops at mixers), so recall is also reported on the in-scope wallets alone.
+    roles = gt.drop_duplicates("address").set_index("address")["role"].fillna("").astype(str)
+    in_scope = set(roles.index[~roles.str.startswith(POST_MIXER_PREFIX)])
+    by_role = {}
+    for role, addrs in roles.groupby(roles).groups.items():
+        found = len(traced & set(addrs))
+        by_role[role] = f"{found}/{len(addrs)}"
     return {
         "ground_truth_wallets": len(truth),
         "traced_wallets": len(traced),
         "found": len(hit),
         "recall": len(hit) / len(truth) if truth else None,
+        "in_scope_wallets": len(in_scope),
+        "in_scope_recall": len(traced & in_scope) / len(in_scope) if in_scope else None,
         "precision_lower_bound": len(hit) / len(traced) if traced and truth else None,
+        "found_by_role": by_role,
         "missed": sorted(truth - traced),
     }
 
@@ -73,7 +89,9 @@ def sensitivity(g: nx.MultiDiGraph, seeds, settings: dict, score_fn, start_time=
     """Confidence stability: perturb every hop factor by +/-p and measure how rankings and bands move."""
     cfg = settings["validation"]
     rng = np.random.default_rng(cfg["random_seed"])
-    base = score_fn(g.copy(), seeds, settings, start_time).set_index("address")
+    work = g.copy()  # scoring rewrites edge factors; keep the caller's graph intact
+    taint = propagate_taint(work, [s.lower() for s in seeds if s.lower() in work], start_time)
+    base = score_fn(work, seeds, settings, start_time, taint=taint).set_index("address")
     if base.empty:
         return {"runs": 0}
     corrs, band_changes, abs_changes = [], [], []
@@ -81,7 +99,7 @@ def sensitivity(g: nx.MultiDiGraph, seeds, settings: dict, score_fn, start_time=
         s = copy.deepcopy(settings)
         for k, v in s["scoring"]["hop_factors"].items():
             s["scoring"]["hop_factors"][k] = float(np.clip(v * (1 + rng.uniform(-1, 1) * cfg["sensitivity_perturbation"]), 1e-4, 1.0))
-        run = score_fn(g.copy(), seeds, s, start_time).set_index("address").reindex(base.index)
+        run = score_fn(work, seeds, s, start_time, taint=taint).set_index("address").reindex(base.index)
         corrs.append(spearman(base["confidence"], run["confidence"].fillna(0)))
         band_changes.append(float((base["band"] != run["band"]).mean()))
         abs_changes.append(float((base["confidence"] - run["confidence"].fillna(0)).abs().mean()))

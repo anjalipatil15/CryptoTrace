@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 
 TEMPLATE = Path(__file__).with_name("template.html")
+# Short, slide-style walkthrough of the same data for presenting a case (no external scripts).
+PRESENTATION = Path(__file__).with_name("presentation.html")
 
 
 def _jsonable(o):
@@ -42,10 +44,10 @@ def _clean(o):
     return o
 
 
-def render_dashboard(insights: dict, out_path: str | Path) -> Path:
+def render_dashboard(insights: dict, out_path: str | Path, template: Path = TEMPLATE) -> Path:
     payload = json.dumps(_clean(insights), default=_jsonable, separators=(",", ":"))
     payload = payload.replace("</", "<\\/")  # never close the <script> tag early
-    html = TEMPLATE.read_text(encoding="utf-8")
+    html = template.read_text(encoding="utf-8")
     html = html.replace("__CASE_TITLE__", insights["case"]["name"]).replace("/*__CASE_DATA__*/null", payload)
     out_path = Path(out_path)
     out_path.write_text(html, encoding="utf-8")

@@ -28,7 +28,8 @@ import pandas as pd
 from .taint import propagate_taint
 
 BAND_ORDER = ["very_high", "high", "medium", "lower", "low", "very_low"]
-CATEGORY_HOP = {"mixer": "mixer", "exchange": "exchange_deposit", "bridge": "bridge", "dex": "swap"}
+CATEGORY_HOP = {"mixer": "mixer", "exchange": "exchange_deposit", "bridge": "bridge", "dex": "swap",
+                "recovery": "recovery_return"}
 
 
 def band_for(score: float, bands: dict) -> str:
@@ -82,10 +83,16 @@ def classify_edges(g: nx.MultiDiGraph, settings: dict, taint: dict) -> None:
         data.update(hop_type=hop_type, fan_in=fan_in, factor=factor)
 
 
-def score(g: nx.MultiDiGraph, seeds: list[str], settings: dict, start_time: pd.Timestamp | None = None) -> pd.DataFrame:
-    """Run taint + classification + max-product path search. Returns one row per on-trail wallet."""
+def score(g: nx.MultiDiGraph, seeds: list[str], settings: dict, start_time: pd.Timestamp | None = None,
+          taint: dict | None = None) -> pd.DataFrame:
+    """Run taint + classification + max-product path search. Returns one row per on-trail wallet.
+
+    Taint does not depend on the hop factors, so callers that re-score the same graph many
+    times (sensitivity, calibration) can pass it in once.
+    """
     seeds = [s.lower() for s in seeds if s.lower() in g]
-    taint = propagate_taint(g, seeds, start_time)
+    if taint is None:
+        taint = propagate_taint(g, seeds, start_time)
     classify_edges(g, settings, taint)
 
     # Best (highest) factor per wallet pair; cost = -log(factor).

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__CASE_TITLE__ · CryptoTrace</title>
+<style>
+:root {
+  --bg: #f7f7f4; --surface: #ffffff; --text: #17181a; --muted: #5f6368; --faint: #9aa0a6;
+  --line: #e3e3de; --accent: #2a6fdb; --accent-soft: #e6effc;
+  --b-very_high: #0d366b; --b-high: #184f95; --b-medium: #2f74c9; --b-lower: #5b97e3; --b-low: #8db7ee; --b-very_low: #b9d2f4;
+  --zone: rgba(42,111,219,.05); --warn: #b4530c;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111213; --surface: #1a1b1d; --text: #ececea; --muted: #a3a6aa; --faint: #6d7176;
+    --line: #2c2d30; --accent: #6ea8ff; --accent-soft: #1b2a40;
+    --b-very_high: #d6e6fc; --b-high: #a9cbf6; --b-medium: #78abee; --b-lower: #4c8be0; --b-low: #2f68b5; --b-very_low: #24508c;
+    --zone: rgba(110,168,255,.06); --warn: #f0a35e; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111213; --surface: #1a1b1d; --text: #ececea; --muted: #a3a6aa; --faint: #6d7176;
+  --line: #2c2d30; --accent: #6ea8ff; --accent-soft: #1b2a40;
+  --b-very_high: #d6e6fc; --b-high: #a9cbf6; --b-medium: #78abee; --b-lower: #4c8be0; --b-low: #2f68b5; --b-very_low: #24508c;
+  --zone: rgba(110,168,255,.06); --warn: #f0a35e; --shadow: none;
+}
+* { box-sizing: border-box; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.slide { min-height: 100vh; scroll-snap-align: start; display: flex; align-items: center; padding: 72px 24px 56px; }
+.inner { width: 100%; max-width: 1040px; margin: 0 auto; }
+.eyebrow { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 14px; }
+h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.08; margin: 0 0 22px; letter-spacing: -.02em; }
+h2 { font-size: clamp(28px, 4.2vw, 42px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -.015em; }
+.lede { font-size: clamp(18px, 2.2vw, 22px); color: var(--muted); max-width: 760px; margin: 0 0 36px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 999px; font-size: 14px; color: var(--muted); }
+.chip strong { color: var(--text); font-weight: 600; }
+.big-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.big { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px 22px 20px; box-shadow: var(--shadow); }
+.big .v { font-size: clamp(30px, 4.4vw, 46px); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.big .k { color: var(--muted); font-size: 15px; margin-top: 6px; }
+.hint { color: var(--faint); font-size: 14px; margin-top: 40px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; font: 13px ui-monospace, monospace; background: var(--surface); }
+
+/* stolen bar */
+.stack { display: flex; height: 54px; border-radius: 12px; overflow: hidden; margin: 8px 0 14px; }
+.stack div { height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+
+/* flow */
+.flow { display: flex; gap: 0; align-items: stretch; }
+.step { flex: 1 1 0; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.arrow { flex: 0 0 26px; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 20px; }
+.step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.step h3 { margin: 0 0 4px; font-size: 17px; }
+.step p { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.4; flex: 1; }
+.step .usd { font-weight: 700; font-size: 20px; }
+.step .when { color: var(--faint); font-size: 12px; margin-top: 2px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+
+/* worked path */
+.path { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin: 10px 0 26px; }
+.node { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 150px; box-shadow: var(--shadow); text-align: center; }
+.node .nm { font-weight: 600; font-size: 15px; }
+.node .sc { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin-top: 4px; }
+.node .bd { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.edge { display: flex; flex-direction: column; align-items: center; padding: 0 10px; min-width: 96px; }
+.edge .f { font-weight: 700; font-size: 18px; }
+.edge .t { font-size: 13px; color: var(--muted); }
+.edge .ln { width: 100%; height: 2px; background: var(--line); margin: 6px 0; position: relative; }
+.edge .ln::after { content: ""; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left-color: var(--faint); }
+.factors { display: flex; flex-wrap: wrap; gap: 8px; }
+.factor { border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 14px; background: var(--surface); }
+.factor b { font-variant-numeric: tabular-nums; }
+
+/* chart */
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 8px 4px; box-shadow: var(--shadow); }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-size: 13px; font-family: inherit; }
+
+/* validation */
+.checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.check { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+.check .v { font-size: clamp(30px, 4.2vw, 44px); font-weight: 700; letter-spacing: -.02em; }
+.check .k { font-weight: 600; margin-top: 4px; }
+.check .s { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.meter { height: 8px; border-radius: 99px; background: var(--line); margin-top: 14px; overflow: hidden; }
+.meter div { height: 100%; background: var(--accent); border-radius: 99px; }
+
+/* ends */
+.split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.takeaways { list-style: none; padding: 0; margin: 0 0 34px; counter-reset: t; }
+.takeaways li { counter-increment: t; position: relative; padding: 16px 18px 16px 60px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 12px; font-size: 18px; box-shadow: var(--shadow); }
+.takeaways li::before { content: counter(t); position: absolute; left: 18px; top: 15px; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--bg); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; }
+:root[data-theme="dark"] .btn { color: #0b1220; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color: #0b1220; } }
+.empty { color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 22px; }
+
+/* chrome */
+.top { position: fixed; inset: 0 0 auto 0; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); z-index: 5; border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; font-size: 15px; }
+.brand span { color: var(--muted); font-weight: 500; }
+.top-r { display: flex; gap: 8px; align-items: center; }
+.icon-btn { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; height: 32px; padding: 0 10px; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.progress { position: fixed; top: 52px; left: 0; height: 2px; background: var(--accent); width: 0; z-index: 6; transition: width .25s; }
+.dots { position: fixed; right: 18px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 5; }
+.dots a { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--faint); display: block; }
+.dots a.on { background: var(--accent); border-color: var(--accent); }
+
+@media (max-width: 820px) {
+  .big-row, .checks, .split2 { grid-template-columns: 1fr; }
+  .flow { flex-direction: column; }
+  .arrow { flex-basis: 22px; transform: rotate(90deg); }
+  .path { flex-direction: column; align-items: stretch; }
+  .edge { flex-direction: row; gap: 10px; padding: 8px 0; justify-content: center; }
+  .edge .ln { display: none; }
+  .dots { display: none; }
+  .slide { padding: 72px 16px 48px; }
+  html { scroll-snap-type: none; }
+}
+@media print { .top, .dots, .progress { display: none; } .slide { break-after: page; min-height: auto; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">CryptoTrace <span id="top-case"></span></div>
+  <div class="top-r">
+    <a class="icon-btn" href="dashboard.html">Full dashboard</a>
+    <button class="icon-btn" id="theme" type="button" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+<div class="progress" id="progress"></div>
+<nav class="dots" id="dots"></nav>
+<main id="slides"></main>
+
+<script id="case-data" type="application/json">/*__CASE_DATA__*/null</script>
+<script>
+(() => {
+"use strict";
+// Wrapped in a function: top-level names like `top` clash with browser globals.
+const D = JSON.parse(document.getElementById("case-data").textContent);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = v => v == null ? "–" : v >= 1e9 ? "$" + (v / 1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? "$" + Math.round(v / 1e3) + "K" : "$" + Math.round(v);
+const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+const day = s => s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "";
+const BAND_LABEL = { very_high: "Very high", high: "High", medium: "Medium", lower: "Lower", low: "Low", very_low: "Very low" };
+const BANDS = Object.keys(BAND_LABEL);
+const bandOf = c => BANDS.find(b => c >= D.method.bands[b]) || "very_low";
+const bandDot = b => `<span class="dot" style="background:var(--b-${b})"></span>`;
+const HOP = { direct: "Direct", split: "Split", fan_out: "Fan-out", swap: "DEX swap", mixer: "Mixer", exchange_deposit: "Exchange", bridge: "Bridge", recovery_return: "Returned" };
+const CAPTION = {
+  theft: "Drained into one attacker wallet", conversion: "Tokens swapped to ETH on DEXes", consolidation: "Swapped ETH regrouped",
+  distribution: "Split across fresh wallets, often in identical amounts", mixer: "Deposited into a mixer", exchange: "Sent to a custodial exchange",
+  bridge: "Bridged off Ethereum", recovery: "Returned to the victim", unresolved: "Still sitting in wallets on the trail",
+};
+const val = D.validation || {}, wi = val.wallet_identification, tc = val.trace_completeness, st = val.confidence_stability;
+const slides = [];
+const add = (id, html) => slides.push(`<section class="slide" id="${id}"><div class="inner">${html}</div></section>`);
+
+// 1. Question
+const mixerEnd = D.endpoints.filter(e => e.category === "mixer").sort((a, b) => a.confidence - b.confidence)[0];
+add("question", `
+  <p class="eyebrow">Forensic case study · Ethereum</p>
+  <h1>When crypto is stolen, how sure can we be about where it went?</h1>
+  <div class="chips">
+    <span class="chip">Case <strong>${esc(D.case.name)}</strong></span>
+    <span class="chip">Date <strong>${day(D.case.date)}</strong></span>
+    ${D.case.attribution ? `<span class="chip">Attribution <strong>${esc(D.case.attribution)}</strong></span>` : ""}
+  </div>
+  <div class="big-row">
+    <div class="big"><div class="v">${usd(D.kpis.stolen_usd)}</div><div class="k">stolen</div></div>
+    <div class="big"><div class="v">${D.kpis.time_to_mixer || "–"}</div><div class="k">from theft to the first mixer deposit</div></div>
+    <div class="big"><div class="v">1.00 → ${mixerEnd ? mixerEnd.confidence.toFixed(2) : "–"}</div><div class="k">confidence, from attacker wallet to ${mixerEnd ? "mixer" : "trail end"}</div></div>
+  </div>
+  <p class="hint">Use <kbd>→</kbd> / <kbd>←</kbd> or scroll to move between screens.</p>`);
+
+// 2. What was stolen
+const PALETTE = ["#2a6fdb", "#e0782f", "#1f9e74", "#c9468c", "#7c5cd6", "#c49a00", "#4aa3c7", "#8a8f98"];
+const toks = D.theft.by_token.slice().sort((a, b) => b.usd - a.usd);
+const topToks = toks.slice(0, 5), rest = toks.slice(5).reduce((s, t) => s + t.usd, 0);
+const parts = topToks.map((t, i) => ({ name: t.token, usd: t.usd, c: PALETTE[i] })).concat(rest > 0 ? [{ name: "Other", usd: rest, c: PALETTE[7] }] : []);
+add("stolen", `
+  <p class="eyebrow">Step 1 · The theft</p>
+  <h2>${usd(D.theft.total_usd)} drained in ${D.theft.by_token.length} assets</h2>
+  <p class="lede">${esc(D.summary[0] || "")}</p>
+  <div class="stack">${parts.map(p => `<div title="${esc(p.name)} ${usd(p.usd)}" style="width:${(100 * p.usd / D.theft.total_usd).toFixed(2)}%;background:${p.c}"></div>`).join("")}</div>
+  <div class="legend">${parts.map(p => `<span><i style="background:${p.c}"></i>${esc(p.name)} <strong style="color:var(--text)">${usd(p.usd)}</strong></span>`).join("")}</div>`);
+
+// 3. Flow
+const stages = D.stages;
+add("flow", `
+  <p class="eyebrow">Step 2 · Following the money</p>
+  <h2>The trail in ${stages.length} stages</h2>
+  <p class="lede">Each stage shows how much money moved and how confident the trail still is at that point.</p>
+  <div class="flow">${stages.map((s, i) => {
+    const lo = s.confidence ? s.confidence[0] : null, hi = s.confidence ? s.confidence[1] : null;
+    const conf = lo == null ? "" : lo === hi || Math.abs(lo - hi) < 0.005 ? `${bandDot(bandOf(lo))}${lo.toFixed(2)} · ${BAND_LABEL[bandOf(lo)]}` : `${bandDot(bandOf(hi))}${lo.toFixed(2)}–${hi.toFixed(2)}`;
+    return (i ? `<div class="arrow" aria-hidden="true">→</div>` : "") + `<div class="step">
+      <div class="n">${i + 1}</div><h3>${esc(s.title)}</h3><p>${esc(CAPTION[s.key] || "")}</p>
+      <div class="usd">${usd(s.usd)}</div>${s.start ? `<div class="when">${day(s.start)}</div>` : ""}
+      <div class="pill">${conf}</div></div>`;
+  }).join("")}</div>`);
+
+// 4. Worked path
+const target = mixerEnd ? D.wallets.find(w => w.address === mixerEnd.address) : D.wallets.slice().sort((a, b) => b.hop - a.hop)[0];
+let pathHtml = `<div class="empty">No multi-hop path on this trail.</div>`;
+if (target && target.path && target.path.length) {
+  let run = 1;
+  const nodeHtml = (name, c) => `<div class="node"><div class="nm">${esc(name)}</div><div class="sc">${c.toFixed(2)}</div><div class="bd">${bandDot(bandOf(c))}${BAND_LABEL[bandOf(c)]}</div></div>`;
+  pathHtml = `<div class="path">${nodeHtml(target.path[0].from_name, 1)}${target.path.map(s => {
+    run *= s.factor;
+    return `<div class="edge"><span class="f">× ${s.factor.toFixed(2)}</span><div class="ln"></div><span class="t">${HOP[s.hop_type] || s.hop_type}</span></div>${nodeHtml(s.to_name, run)}`;
+  }).join("")}</div>`;
+}
+const F = D.method.hop_factors;
+add("method", `
+  <p class="eyebrow">Step 3 · How a score is calculated</p>
+  <h2>Every hop multiplies the uncertainty</h2>
+  <p class="lede">Each transfer gets a factor by type. A wallet's score is the product along its best path from the attacker. Here is a real path from this case:</p>
+  ${pathHtml}
+  <div class="factors">${Object.entries(F).map(([k, v]) => `<span class="factor">${HOP[k] || k} <b>× ${v.toFixed(2)}</b></span>`).join("")}</div>`);
+
+// 5. Decay chart
+function decaySvg() {
+  const W = 960, H = 400, L = 56, R = 150, T = 18, B = 46;
+  const pts = D.wallets.filter(w => w.category !== "dex");
+  const maxHop = Math.max(1, ...pts.map(w => w.hop));
+  const x = h => L + (W - L - R) * h / maxHop, y = c => T + (H - T - B) * (1 - c);
+  let g = "";
+  BANDS.forEach((b, i) => {
+    const lo = D.method.bands[b], hi = i ? D.method.bands[BANDS[i - 1]] : 1;
+    g += `<rect x="${L}" y="${y(hi)}" width="${W - L - R}" height="${y(lo) - y(hi)}" fill="${i % 2 ? "var(--zone)" : "transparent"}"/>`;
+    g += `<text x="${W - R + 10}" y="${(y(hi) + y(lo)) / 2 + 4}">${BAND_LABEL[b]}</text>`;
+  });
+  for (let h = 0; h <= maxHop; h++) g += `<text x="${x(h)}" y="${H - 18}" text-anchor="middle">${h === 0 ? "Attacker" : "Hop " + h}</text>`;
+  [0, 0.5, 1].forEach(c => { g += `<text x="${L - 10}" y="${y(c) + 4}" text-anchor="end">${c.toFixed(1)}</text>`; });
+  const med = [];
+  for (let h = 0; h <= maxHop; h++) {
+    const cs = pts.filter(w => w.hop === h && w.category === "wallet").map(w => w.confidence).sort((a, b) => a - b);
+    if (cs.length) med.push([h, cs[Math.floor((cs.length - 1) / 2)]]);
+  }
+  g += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 5" points="${med.map(([h, c]) => `${x(h)},${y(c)}`).join(" ")}"/>`;
+  pts.forEach((w, i) => {
+    const jx = ((i * 37) % 21 - 10) * 3.2, cx = x(w.hop) + (w.hop ? jx : 0), cy = y(w.confidence);
+    if (w.category === "wallet") g += `<circle cx="${cx}" cy="${cy}" r="6" fill="var(--b-${w.band})" stroke="var(--surface)" stroke-width="1.5"><title>${esc(w.name)}: ${w.confidence.toFixed(2)}</title></circle>`;
+    else g += `<path d="M${cx},${cy - 9} L${cx + 9},${cy + 7} L${cx - 9},${cy + 7} Z" fill="var(--warn)"><title>${esc(w.name)}: ${w.confidence.toFixed(3)}</title></path><text x="${cx - 14}" y="${cy - 14}" text-anchor="end" style="fill:var(--text);font-weight:600">${esc(w.name)} · ${w.confidence.toFixed(2)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Confidence by hop distance">${g}</svg>`;
+}
+add("decay", `
+  <p class="eyebrow">Step 4 · The result</p>
+  <h2>Confidence decays hop by hop, then collapses at the ${mixerEnd ? "mixer" : "trail end"}</h2>
+  <p class="lede">Each dot is a wallet on the trail; the dashed line is the typical (median) wallet per hop. Triangles are services where the trail ends.</p>
+  <div class="chart">${decaySvg()}</div>`);
+
+// 6. Validation
+let checks;
+if (wi) {
+  const inN = wi.in_scope_wallets ?? wi.ground_truth_wallets, inR = wi.in_scope_recall ?? wi.recall;
+  const tile = (v, k, s, r) => `<div class="check"><div class="v">${v}</div><div class="k">${k}</div><div class="s">${s}</div>${r == null ? "" : `<div class="meter"><div style="width:${Math.round(r * 100)}%"></div></div>`}</div>`;
+  checks = `<div class="checks">
+    ${tile(`${Math.round(inR * inN)} / ${inN}`, "named wallets found", "Wallets named in public investigation reports, before the mixer", inR)}
+    ${tc && tc.documented_steps ? tile(`${tc.reconstructed_steps} / ${tc.documented_steps}`, "documented hops rebuilt", "Step-by-step paths described in those reports", tc.completeness) : tile("–", "documented hops rebuilt", "No documented paths for this case yet", null)}
+    ${st && st.runs ? tile(st.rank_correlation_mean.toFixed(2), "ranking stability", `Rank correlation when every factor is shifted ±${Math.round(st.perturbation * 100)}%, ${st.runs} runs (1.0 = unchanged)`, st.rank_correlation_mean) : ""}
+  </div>`;
+} else {
+  checks = `<div class="empty">No public ground truth loaded for this case yet.</div>`;
+}
+add("validation", `
+  <p class="eyebrow">Step 5 · Did we get it right?</p>
+  <h2>Checked against public investigations</h2>
+  <p class="lede">We compare the reconstructed trail with wallets and paths that security firms published for this case.</p>
+  ${checks}`);
+
+// 7. Limits + takeaways
+const post = wi && wi.found_by_role ? Object.entries(wi.found_by_role).filter(([r]) => r.startsWith("post_mixer")) : [];
+const postTot = post.reduce((s, [, v]) => s + +v.split("/")[1], 0), postFound = post.reduce((s, [, v]) => s + +v.split("/")[0], 0);
+const lowShare = D.value_by_band ? (D.value_by_band.low + D.value_by_band.very_low) / Math.max(1, Object.values(D.value_by_band).reduce((a, b) => a + b, 0)) : null;
+const take = [
+  D.kpis.time_to_mixer ? `The money went from theft to a mixer in ${D.kpis.time_to_mixer}, through ${stages.length} stages.` : `The trail runs through ${stages.length} stages.`,
+  mixerEnd ? `Confidence fell from 1.00 at the attacker wallet to ${mixerEnd.confidence.toFixed(2)} at the mixer.` : `Confidence falls with every hop away from the attacker wallet.`,
+  wi ? `${Math.round((wi.in_scope_recall ?? wi.recall) * (wi.in_scope_wallets ?? wi.ground_truth_wallets))} of ${wi.in_scope_wallets ?? wi.ground_truth_wallets} publicly named wallets before the mixer were found automatically.` : `Validation needs public ground truth for this case.`,
+];
+add("limits", `
+  <p class="eyebrow">Step 6 · Where on-chain tracing stops</p>
+  <h2>Beyond the mixer, the blockchain alone can't tell us who owns the money</h2>
+  <div class="split2" style="margin:8px 0 34px">
+    <div class="big"><div class="v">${lowShare == null ? "–" : pct(lowShare)}</div><div class="k">of the traced value ends at Low or Very low confidence</div></div>
+    ${postTot ? `<div class="big"><div class="v">${postFound} / ${postTot}</div><div class="k">wallets named after the mixer were reached, as expected: that needs off-chain evidence</div></div>` : `<div class="big"><div class="v">${D.endpoints.length}</div><div class="k">places where the trail ends (mixers, exchanges, bridges, wallets still holding funds)</div></div>`}
+  </div>
+  <ul class="takeaways">${take.map(t => `<li>${esc(t)}</li>`).join("")}</ul>
+  <a class="btn" href="dashboard.html">Open the full dashboard →</a>`);
+
+document.getElementById("slides").innerHTML = slides.join("");
+document.getElementById("top-case").textContent = "· " + D.case.name;
+
+// navigation
+const secs = [...document.querySelectorAll(".slide")];
+const dots = document.getElementById("dots");
+dots.innerHTML = secs.map(s => `<a href="#${s.id}" aria-label="${s.id}"></a>`).join("");
+const dotEls = [...dots.children];
+let cur = 0;
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) {
+    cur = secs.indexOf(e.target);
+    dotEls.forEach((d, i) => d.classList.toggle("on", i === cur));
+    document.getElementById("progress").style.width = (100 * (cur + 1) / secs.length) + "%";
+  }
+}), { threshold: 0.55 });
+secs.forEach(s => io.observe(s));
+// Slides are built after load, so jump to a #slide link (or a refreshed position) ourselves.
+const start = location.hash && document.getElementById(location.hash.slice(1));
+if (start) start.scrollIntoView({ behavior: "instant" });
+const go = i => secs[Math.max(0, Math.min(secs.length - 1, i))].scrollIntoView({ behavior: "smooth" });
+document.addEventListener("keydown", e => {
+  if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+});
+
+// theme
+const root = document.documentElement;
+try { const t = localStorage.getItem("ct-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+document.getElementById("theme").addEventListener("click", () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("ct-theme", root.dataset.theme); } catch (e) {}
+});
+})();
+</script>
+</body>
+</html>

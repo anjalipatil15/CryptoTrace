@@ -9,6 +9,7 @@ SERVICE_EVENTS = {
     "exchange": "Exchange deposit",
     "bridge": "Bridge transfer (leaves chain)",
     "dex": "DEX swap",
+    "recovery": "Returned to recovery wallet",
 }
 
 

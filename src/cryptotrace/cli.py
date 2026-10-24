@@ -2,6 +2,7 @@
 
     cryptotrace trace   config/cases/harmony.yaml     # Phase 1-2: collect into SQLite
     cryptotrace analyze config/cases/harmony.yaml     # Phase 3-7: score, detect, report
+    cryptotrace calibrate config/cases/nomad.yaml     # tune factors for stability (calibration case only)
 """
 
 from __future__ import annotations
@@ -59,6 +60,33 @@ def cmd_analyze(args) -> None:
     _print_files(write_outputs(result, case, PROJECT_ROOT / "outputs" / case.case_id))
 
 
+def cmd_calibrate(args) -> None:
+    import yaml
+
+    from .graph.builder import build_graph
+    from .storage.db import Database
+    from .validation.calibration import calibrate
+    from .validation.metrics import load_ground_truth
+
+    case = load_case(args.case)
+    db = Database(resolve(case.settings["storage"]["db_path"]))
+    transfers, nodes = db.load_transfers(case.case_id), db.load_nodes(case.case_id)
+    if transfers.empty:
+        raise SystemExit(f"No transfers stored for '{case.case_id}'. Run `cryptotrace trace {args.case}` first.")
+    g = build_graph(transfers, labels_for_case(case.case_id), nodes)
+    table, best = calibrate(g, case.seeds, case.settings, case.start_time, load_ground_truth(case.ground_truth),
+                            runs=args.runs)
+    out = PROJECT_ROOT / "outputs" / case.case_id
+    out.mkdir(parents=True, exist_ok=True)
+    table.to_csv(out / "calibration.csv", index=False)
+    cols = ["candidate", "direct", "split", "fan_out", "swap", "band_change_rate", "rank_correlation", "auc_non_seed"]
+    print(table.sort_values("band_change_rate")[cols].head(8).round(4).to_string(index=False))
+    print(f"\nAll {len(table)} candidates -> {out / 'calibration.csv'}")
+    print("Chosen (copy into config/settings.yaml to freeze):")
+    print(yaml.safe_dump({"scoring": {"hop_factors": best["scoring"]["hop_factors"], "bands": best["scoring"]["bands"]}},
+                         sort_keys=False))
+
+
 def _theft_source_names(case, transfers, nodes, db) -> dict:
     """Verified contract names of the addresses that paid the attacker (e.g. the exploited bridge)."""
     from .collection.etherscan import EtherscanClient
@@ -90,6 +118,10 @@ def main(argv=None) -> None:
     p.add_argument("case")
     p.add_argument("--no-sensitivity", action="store_true", help="skip the perturbation analysis")
     p.set_defaults(func=cmd_analyze)
+    p = sub.add_parser("calibrate", help="tune hop factors for stability on a calibration case (Nomad)")
+    p.add_argument("case")
+    p.add_argument("--runs", type=int, default=100, help="noise runs per candidate (default 100)")
+    p.set_defaults(func=cmd_calibrate)
     args = parser.parse_args(argv)
     args.func(args)
 

@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS trace_nodes (
 class Database:
     def __init__(self, path: str | Path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        # Wait for a lock instead of failing after the default 5 s (a long trace can overlap a read).
+        self.conn = sqlite3.connect(str(path), timeout=120)
         self.conn.executescript(SCHEMA)
 
     # --- API cache -----------------------------------------------------------

@@ -18,7 +18,7 @@
   --band-very_high: #0d366b; --band-high: #184f95; --band-medium: #256abf;
   --band-lower: #3987e5; --band-low: #6da7ec; --band-very_low: #86b6ef;
   --ht-direct: #2a78d6; --ht-split: #eb6834; --ht-fan_out: #1baf7a; --ht-swap: #eda100;
-  --ht-mixer: #e87ba4; --ht-exchange_deposit: #008300; --ht-bridge: #6250d6;
+  --ht-mixer: #e87ba4; --ht-exchange_deposit: #008300; --ht-bridge: #6250d6; --ht-recovery_return: #6b7280;
   --edge: #b5b4ad; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
 }
 @media (prefers-color-scheme: dark) {
@@ -30,7 +30,7 @@
     --band-very_high: #cde2fb; --band-high: #9ec5f4; --band-medium: #6da7ec;
     --band-lower: #3987e5; --band-low: #256abf; --band-very_low: #1c5cab;
     --ht-direct: #3987e5; --ht-split: #d95926; --ht-fan_out: #199e70; --ht-swap: #c98500;
-    --ht-mixer: #d55181; --ht-exchange_deposit: #008300; --ht-bridge: #9085e9;
+    --ht-mixer: #d55181; --ht-exchange_deposit: #008300; --ht-bridge: #9085e9; --ht-recovery_return: #9ca3af;
     --edge: #5a5a54; --shadow: none;
   }
 }
@@ -42,7 +42,7 @@
   --band-very_high: #cde2fb; --band-high: #9ec5f4; --band-medium: #6da7ec;
   --band-lower: #3987e5; --band-low: #256abf; --band-very_low: #1c5cab;
   --ht-direct: #3987e5; --ht-split: #d95926; --ht-fan_out: #199e70; --ht-swap: #c98500;
-  --ht-mixer: #d55181; --ht-exchange_deposit: #008300; --ht-bridge: #9085e9;
+  --ht-mixer: #d55181; --ht-exchange_deposit: #008300; --ht-bridge: #9085e9; --ht-recovery_return: #9ca3af;
   --edge: #5a5a54; --shadow: none;
 }
 * { box-sizing: border-box; }
@@ -319,7 +319,7 @@ const D = JSON.parse(document.getElementById('case-data').textContent);
 const $ = (s, el = document) => el.querySelector(s);
 const BANDS = ['very_high', 'high', 'medium', 'lower', 'low', 'very_low'];
 const BAND_LABEL = { very_high: 'Very high', high: 'High', medium: 'Medium', lower: 'Lower', low: 'Low', very_low: 'Very low' };
-const HOP_LABEL = { direct: 'Direct', split: 'Split', fan_out: 'Fan-out', swap: 'Swap (DEX)', mixer: 'Mixer deposit', exchange_deposit: 'Exchange deposit', bridge: 'Bridge' };
+const HOP_LABEL = { direct: 'Direct', split: 'Split', fan_out: 'Fan-out', swap: 'Swap (DEX)', mixer: 'Mixer deposit', exchange_deposit: 'Exchange deposit', bridge: 'Bridge', recovery_return: 'Returned' };
 const HOP_RULE = {
   direct: 'Sender paid a single wallet in the time window',
   split: 'Sender paid 2–4 wallets in the window',
@@ -327,6 +327,7 @@ const HOP_RULE = {
   swap: 'Receiver is a DEX pool or router (asset converts, owner unchanged)',
   exchange_deposit: 'Receiver is a custodial exchange (trail ends)',
   bridge: 'Receiver is a cross-chain bridge (trail ends)',
+  recovery_return: "Receiver is the victim's recovery wallet (funds returned)",
   mixer: 'Receiver is a mixer (trail ends)',
 };
 const byAddr = Object.fromEntries(D.wallets.map(w => [w.address, w]));
@@ -593,6 +594,7 @@ function renderMethod() {
   const v = D.validation, wi = v.wallet_identification, tc = v.trace_completeness, cal = v.calibration;
   $('#validation').innerHTML = wi ? `<dl class="kv">
       <dt>Publicly named wallets found</dt><dd>${wi.found} / ${wi.ground_truth_wallets} (${pct(wi.recall)})</dd>
+      ${wi.in_scope_wallets != null ? `<dt>Before the mixer (in scope)</dt><dd>${Math.round(wi.in_scope_recall * wi.in_scope_wallets)} / ${wi.in_scope_wallets} (${pct(wi.in_scope_recall)})</dd>` : ''}
       <dt>Precision (lower bound)</dt><dd>${pct(wi.precision_lower_bound)}</dd>
       <dt>Documented path steps rebuilt</dt><dd>${tc && tc.documented_steps ? `${tc.reconstructed_steps} / ${tc.documented_steps} (${pct(tc.completeness)})` : '–'}</dd>
       <dt>Calibration AUC</dt><dd>${cal && cal.confidence_auc != null ? cal.confidence_auc.toFixed(2) : '–'}</dd></dl>
@@ -621,7 +623,7 @@ function renderMethod() {
 
 /* ---------- graph ---------- */
 let cy;
-const SHAPES = { wallet: 'ellipse', dex: 'round-diamond', mixer: 'triangle', exchange: 'round-rectangle', bridge: 'hexagon' };
+const SHAPES = { wallet: 'ellipse', dex: 'round-diamond', mixer: 'triangle', exchange: 'round-rectangle', bridge: 'hexagon', recovery: 'star' };
 function nodeSize(w) { return 16 + Math.max(0, Math.min(1, (Math.log10((w.in_usd || 0) + 1) - 3) / 5)) * 30; }
 function buildGraph() {
   const els = [];

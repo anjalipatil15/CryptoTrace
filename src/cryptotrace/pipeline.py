@@ -9,7 +9,7 @@ import networkx as nx
 import pandas as pd
 
 from .analysis.insights import build_insights
-from .dashboard.build import render_dashboard
+from .dashboard.build import PRESENTATION, render_dashboard
 from .graph.builder import build_graph
 from .labels import LabelStore
 from .patterns.detectors import detect_all
@@ -65,6 +65,7 @@ def write_outputs(result: Analysis, case, out_dir: str | Path) -> dict[str, Path
     result.patterns.to_csv(files["patterns"], index=False)
     result.timeline.to_csv(files["timeline"], index=False)
     files["dashboard"] = render_dashboard(result.insights, out / "dashboard.html")
+    files["present"] = render_dashboard(result.insights, out / "presentation.html", PRESENTATION)
     files["report"] = write_report(case, result.scored, result.patterns, result.timeline, result.validation,
                                    out / "report.md")
     return files

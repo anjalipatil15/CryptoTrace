@@ -7,7 +7,8 @@ etherscan:
   base_url: https://api.etherscan.io/v2/api
   chain_id: 1                 # Ethereum mainnet
   rate_limit_per_sec: 4       # free tier allows 5/s; stay under it
-  page_size: 10000            # max rows per call; a full page => high-activity address
+  page_size: 10000            # rows read per address and kind; a full page => high-activity address
+  rows_per_call: 1000         # Etherscan caps each response at 1,000 rows, so page_size is read in pages
 
 storage:
   db_path: data/cryptotrace.db
@@ -22,7 +23,7 @@ tracing:
   # Unlisted addresses whose verified Etherscan contract name contains one of these
   # are auto-labeled as DEX (pools / pairs / routers) and not expanded.
   dex_contract_patterns: [UniswapV2Pair, UniswapV3Pool, SushiSwap, Curve, Balancer, SwapRouter,
-                          AggregationRouter, "0x: Exchange", PancakeV3Pool]
+                          AggregationRouter, "0x: Exchange", PancakeV3Pool, GPv2Settlement]
   # Only these ERC-20 contracts are followed. This removes spam / address-poisoning
   # tokens, which otherwise explode the graph. Add tokens relevant to your case.
   token_allowlist:
@@ -56,6 +57,7 @@ scoring:
     exchange_deposit: 0.30  # custodial: ownership after deposit is unknowable on-chain
     bridge: 0.25            # leaves the chain (cross-chain out of scope)
     mixer: 0.05             # Tornado Cash etc.
+    recovery_return: 0.92   # returned to the victim's published recovery wallet (trail ends)
   # Fan-in adjustment applied to the receiving wallet:
   #   factor = fan_in_floor + (1 - fan_in_floor) * taint_ratio(receiver)
   # All-tainted consolidation => no penalty; mixing with clean funds => penalty.
@@ -80,6 +82,6 @@ patterns:
   circular_max_length: 6
 
 validation:
-  sensitivity_runs: 50
+  sensitivity_runs: 500             # 50 runs gave band-change rates that moved by 6 points between seeds
   sensitivity_perturbation: 0.10   # +/-10% on every hop factor
   random_seed: 42

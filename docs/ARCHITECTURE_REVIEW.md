@@ -4,6 +4,84 @@ Review of *Confidence-Based Reconstruction of Cryptocurrency Theft Transaction T
 (proposal + flow diagrams). It covers what holds up, what needs to change, and how
 the codebase in this repository puts those changes into practice.
 
+## The pipeline in plain words
+
+We start from the wallet that received the stolen money and follow the money, step by step,
+until it reaches a place where it can no longer be followed. At every step we ask: how sure are
+we that this wallet still holds the stolen money?
+
+**1. Collect.** For the attacker's wallet we download its full transaction history from Etherscan,
+a free website that publishes all Ethereum transactions. Every wallet it sent stolen money to
+is downloaded next ("hop 1"), then the wallets those sent to ("hop 2"), and so on. Downloads are
+saved in a local database file, so nothing has to be downloaded twice.
+
+**2. Know when to stop.** We don't download everything, or one transfer to Binance would pull in
+millions of unrelated transactions. The trail stops at:
+- **services**: mixers (Tornado Cash), exchanges, bridges to other blockchains, and token-swap
+  services. These come from a list of known addresses (`data/labels/`), each with a source.
+- **very busy addresses** (10,000+ transactions): almost always bots or services.
+- **limits**: a maximum number of steps and a maximum number of wallets.
+
+We also only follow money sent *after* the stolen funds arrived, and only real tokens (USDC,
+ETH, ...), which filters out the junk tokens scammers send to these wallets.
+
+**3. Draw the map.** All the transfers become a map: wallets are dots, transfers are arrows.
+
+**4. Score every wallet.** Each step multiplies our certainty by a number that depends on what
+kind of step it was:
+
+| Step | Number | Why |
+|---|---|---|
+| the wallet paid just one other wallet | × 0.92 | the money clearly went there |
+| the wallet split the money between 2-4 wallets | × 0.80 | the trail branches |
+| it spread the money across 5 or more wallets | × 0.60 | many branches, harder to follow |
+| it swapped tokens (e.g. USDC for ETH) | × 0.90 | different coin, same owner |
+| it sent money to an exchange | × 0.30 | the exchange holds it; only the exchange knows the owner |
+| it sent money to a bridge | × 0.25 | the money left Ethereum |
+| it sent money into a mixer | × 0.05 | the mixer pools money from many users; ownership is lost |
+
+The attacker's own wallet starts at 1.00. Example from Harmony: attacker 1.00 → paid one wallet
+(× 0.92 = 0.92) → that wallet split the money (× 0.80 = 0.74) → it went into Tornado Cash
+(× 0.05 = **0.04**). If a wallet can be reached in several ways, it gets its best score. Scores are
+grouped into six labels, from *Very high* to *Very low*.
+
+We also track **what share of each wallet's money is stolen** ("taint"). If a wallet mixes stolen
+money with its own clean money, we are less sure what it does next, so its score is lowered.
+
+**5. Spot laundering tricks.** We look for known patterns: one wallet paying many (fan-out), many
+paying one (fan-in), long chains of wallets passing money along, money moving within minutes,
+and money coming back in a circle.
+
+**6. Put it in order.** All events are sorted into a timeline: theft, swaps, splits, mixing.
+
+**7. Check the result.** Security firms (Elliptic, Merkle Science) published some of the
+attacker's wallets for these cases. We check how many of those our trail found on its own, and
+whether the documented steps between them are on our trail. We also nudge all the numbers in the
+table up and down by 10%, 500 times, and check whether the scores and labels stay the same.
+
+**Tuning the numbers ("calibration").** The numbers in the table are reasonable starting values.
+We tune them on one case (Nomad) and then test on the other (Harmony) without changing them
+again, so the test is fair.
+
+**Output.** For each case: a short presentation, an interactive dashboard, a written report and
+spreadsheets (`outputs/<case>/`).
+
+### Words used in this document
+
+| Word | Meaning |
+|---|---|
+| hop | one step of the money, from one wallet to the next |
+| seed | the starting wallet(s): where the stolen money first landed |
+| mixer | a service that pools money from many users so it can't be followed (Tornado Cash) |
+| bridge | a service that moves money to another blockchain |
+| DEX / swap | a service that exchanges one token for another (Uniswap, Curve) |
+| taint | the share of a wallet's money that is stolen |
+| ground truth | wallets that published investigations say belong to the attacker |
+| recall | how many of those our trail found |
+| band | the label for a score: Very high, High, Medium, Lower, Low, Very low |
+
+The rest of this document is the original review of the proposal: what it changed and why.
+
 ## Verdict
 
 **The project is sound and can be built in a semester.** The research question ("how does
@@ -44,6 +122,7 @@ confidence(wallet) = max over paths from seed of  product(hop_factor(edge))
 | exchange_deposit | 0.30 | receiver is a labeled exchange (trail ends) |
 | bridge | 0.25 | receiver is a bridge (trail ends, cross-chain out of scope) |
 | mixer | 0.05 | receiver is a mixer (trail ends) |
+| recovery_return | 0.92 | receiver is the victim's published recovery wallet (funds returned, trail ends); added for Nomad |
 | fan-in adjustment | x (0.6 + 0.4 x taint) | receiver has >= 3 senders; penalty scales with how much *clean* money is mixed in |
 
 The resulting number maps back onto your original wording (bands: Very High >= 0.90,
@@ -69,8 +148,10 @@ balance. If the trace naively follows every outgoing transaction, two things go 
 - **Time violations.** The trace follows payments made *before* the stolen funds arrived.
   Rule: only follow an outflow if the sender already held tainted funds at that moment.
 - **Graph explosion.** One hop into a Binance hot wallet adds millions of transactions.
-  Rule: never expand labeled services (exchange, mixer, bridge, DEX). Treat any unlabeled
-  address with a full page of history (>= 10,000 txs) as an unknown service.
+  Rule: never expand labeled services (exchange, mixer, bridge, DEX, recovery wallet). Treat any
+  unlabeled address with >= 10,000 transactions of one kind as an unknown service. Etherscan returns
+  at most 1,000 rows per call, so histories are read in pages; reading only the first call would
+  silently truncate busy addresses and the service rule would never trigger.
   Also add a hop limit, an address limit, and a per-token dust threshold.
 
 This needs a **label dataset**, which the proposal does not mention. Etherscan's labels
@@ -99,18 +180,25 @@ because symbols can be spoofed.
 - **Circular feedback loop (Figure 7).** If you refine the rules until Harmony matches the FBI
   report and then report accuracy on Harmony, the result is overfit. Instead, **calibrate on
   Nomad, evaluate on Harmony** (held out). (Ronin was dropped from scope: too large for the time available.)
+- **What "calibrate" means here.** Nomad has very few independent labels beyond its seeds, too few
+  to tune seven factors for accuracy without overfitting. The factors are therefore tuned for
+  *robustness* (`cryptotrace calibrate`): keep the ordering direct > split > fan-out, nudge each band
+  cut-off by at most 0.05 away from clusters of scores, and pick the factor set whose bands change
+  least under noise without ranking the known Nomad wallets worse. The result is frozen before Harmony is evaluated.
 - **Ground truth is partial.** Public reports name *some* attacker wallets, never all of them.
   Report recall as the main metric and present precision only as a lower bound.
 - **Define the metrics exactly** (the proposal's "confidence stability" is vague):
-  - *Wallet recall*: share of wallets named in public reports that appear on the trail.
+  - *Wallet recall*: share of wallets named in public reports that appear on the trail. Reported
+    separately for wallets before the mixer (*in-scope recall*), because tracing stops at mixers by design.
   - *Trace completeness*: share of documented path steps reconstructed.
   - *Calibration AUC*: do confirmed wallets score higher than unconfirmed ones? (0.5 means chance.)
-  - *Confidence stability*: perturb every factor by +/-10%, 50 times, and report the Spearman rank
-    correlation and the share of wallets whose band changes.
+  - *Confidence stability*: perturb every factor by +/-10%, 500 times, and report the Spearman rank
+    correlation and the share of wallets whose band changes. (50 runs proved too noisy: the band-change
+    rate moved by 6 points between random seeds.)
 
-  The real Harmony run gives the same picture: rankings stay fairly stable (mean rho 0.92), but about 31% of
-  bands flip under +/-10% noise. Discrete bands are fragile near their thresholds,
-  which is worth discussing in the report.
+  The uncalibrated Harmony run shows rankings that stay stable (mean rho 0.92) while about 27% of
+  bands flip under +/-10% noise. Discrete bands are fragile near their thresholds, which is what
+  the robustness calibration targets. Results are in [RESULTS.md](RESULTS.md).
 
 ## 5. Smaller fixes to the documents
 
@@ -130,7 +218,7 @@ because symbols can be spoofed.
 ## 6. Revised pipeline (as implemented)
 
 ```
-Phase 1  collection/etherscan.py  Etherscan V2 client (rate-limited, SQLite cache)
+Phase 1  collection/etherscan.py  Etherscan V2 client (rate-limited, paged, retries, SQLite cache)
          collection/tracer.py     bounded, time-respecting BFS; stops at labeled services
 Phase 2  processing/preprocess.py normalize 3 tx streams, dedup, drop failed/zero/spam
 Phase 3  graph/builder.py         MultiDiGraph: wallets = nodes, transfers = edges
@@ -138,18 +226,16 @@ Phase 4  scoring/taint.py         haircut taint, time-ordered (defines which edg
          scoring/confidence.py    hop classification -> factors -> max-product path -> bands
 Phase 5  patterns/detectors.py    fan-out, fan-in, peeling chain, rapid movement, circular
 Phase 6  timeline/reconstruct.py  chronological events (hops, services, patterns)
-Phase 7  validation/metrics.py    recall, completeness, calibration AUC, sensitivity
+Phase 7  validation/metrics.py    recall (overall + in-scope), completeness, AUC, sensitivity
+         validation/calibration.py robustness calibration of the factors (calibration case only)
 Output   analysis/insights.py     roles, USD values, endpoints, staged narrative, chart series
-         dashboard/               self-contained HTML dashboard (ECharts + Cytoscape.js)
+         dashboard/               interactive dashboard (ECharts + Cytoscape.js) + offline presentation
          report/                  Markdown report, CSVs
+Data     scripts/nomad_exploiters.py  Nomad seeds and returners derived from on-chain data
 ```
 
-## 7. Suggested schedule
+## 7. Status
 
-| Weeks | Work |
-|---|---|
-| 1-2 | Verify the seed addresses and build ground-truth CSVs from the FBI / Harmony / Chainalysis sources; extend the labels |
-| 3-4 | `trace` the Harmony case; inspect the graph and tune the limits (hops, dust, allowlist) |
-| 5-6 | Calibrate factors on Nomad; freeze the factors |
-| 7-8 | Evaluate on Harmony (held out); run the sensitivity analysis |
-| 9-10 | Write up the results; figures from `outputs/` |
+Done: ground truth, the Harmony trace and analysis, the Nomad data and the calibration code.
+Left: calibrating on a smaller Nomad case, the final Harmony run with the frozen numbers, and the
+write-up; step by step in [NEXT_STEPS.md](NEXT_STEPS.md). Results so far: [RESULTS.md](RESULTS.md).

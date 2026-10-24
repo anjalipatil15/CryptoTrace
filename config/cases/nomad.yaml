@@ -8,12 +8,33 @@ description: >
   CALIBRATION case for tuning scoring weights (keep Harmony held out for evaluation).
 
 attribution: Hundreds of independent exploiters
+references:
+  - "rekt.news: Nomad Bridge - REKT (Aug 2022)"
+  - "Mandiant / Google Cloud: Dissecting the Nomad Bridge Hack (address clusters, Groups A-D)"
+  - "PeckShield (2 Aug 2022): ~41 addresses took ~$152M, incl. ~7 MEV bots, the Rari Capital exploiter and 6 white hats"
+  - "Nomad recovery address announcement (Aug 2022): 0x94A84433101A10aEda762968f6995c574D1bF154"
 # Approximate prices on 1 Aug 2022 -- verify (e.g. cross-check against swap rates in the data).
-prices_usd: {ETH: 1650, WETH: 1650, WBTC: 23000, USDC: 1, USDT: 1, DAI: 1, FRAX: 1}
+prices_usd: {ETH: 1650, WETH: 1650, WBTC: 23000, USDC: 1, USDT: 1, DAI: 1, FRAX: 1, CQT: 0.10}
+# CQT: the exploiters' first sales (23:15-23:25 UTC, 1 Aug) filled at $0.086-0.108 per CQT;
+# their dumping later pushed it to $0.03-0.06. $0.10 is the pre-dump level.
 
 # Many seeds: populate from Nomad's published exploit data (exploiter addresses and
-# white-hat return lists). Leave empty until sourced -- do not guess addresses.
-seeds: []
+# white-hat return lists). Only add sourced addresses -- do not guess.
+# Source: rekt.news "Nomad Bridge - REKT" (Aug 2022): the top three addresses, the
+# self-declared whitehat 🍉🍉🍉.eth and the Rari Capital Arbitrum exploiter.
+seeds:
+  - "0x56d8b635a7c88fd1104d23d632af40c1c3aac4e3"   # ~$47M
+  - "0xbf293d5138a2a1ba407b43672643434c43827179"   # ~$40M
+  - "0xb5c55f76f90cc528b2609109ca14d8d84593590e"   # ~$8M
+  - "0x9634445e293a87ab77ca3cf5b43da94aabc544b6"   # 🍉🍉🍉.eth, ~$4M
+  - "0x65760288f19cff476b80a36a61f9dedab16bab49"   # Rari Capital exploiter, ~$3M
+
+# Plus every address the Nomad bridge router paid during the exploit window with at least
+# $100K (293 of 585 recipients, 99.9% of the priced value). On-chain fact; regenerate with
+# `python scripts/nomad_exploiters.py`.
+seeds_from:
+  file: data/ground_truth/nomad_exploiters.csv
+  min_usd: 100000
 
 start_time: 2022-08-01T00:00:00Z
 ground_truth: data/ground_truth/nomad.csv
@@ -21,4 +42,12 @@ ground_truth: data/ground_truth/nomad.csv
 overrides:
   tracing:
     max_hops: 3
-    max_addresses: 2000
+    # Capped at 1,100 (planned 2,000): all seeds and hop 1 are covered; the cap trims hop 2.
+    # Busy bot/service addresses cost ~30 API calls each to classify, so 2,000 took hours.
+    max_addresses: 1100
+    # Covalent's CQT was one of the main tokens drained from Nomad (Covalent blog, Aug 2022).
+    # Its price (prices_usd.CQT) comes from the exploiters' own swaps.
+    token_allowlist:
+      "0xd417144312dbf50465b1c641d016962017ef6240": CQT
+    min_value:
+      CQT: 1000

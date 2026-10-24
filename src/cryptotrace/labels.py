@@ -28,7 +28,7 @@ def labels_for_case(case_id: str) -> "LabelStore":
 
 # Categories where tracing stops (we never fetch these addresses' history:
 # exchange hot wallets alone have millions of transactions).
-TERMINAL_CATEGORIES = {"mixer", "exchange", "bridge", "dex"}
+TERMINAL_CATEGORIES = {"mixer", "exchange", "bridge", "dex", "recovery"}
 
 
 @dataclass(frozen=True)

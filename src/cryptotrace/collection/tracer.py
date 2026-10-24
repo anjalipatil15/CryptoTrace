@@ -73,6 +73,7 @@ def trace(
     first_taint: dict[str, pd.Timestamp] = {s.lower(): earliest for s in seeds}
     hop_of: dict[str, int] = {s.lower(): 0 for s in seeds}
     status: dict[str, str] = {}
+    fetched = 0  # addresses whose history was read (expanded or service)
     frames: list[pd.DataFrame] = []
     log: list[str] = []
 
@@ -85,18 +86,22 @@ def trace(
         addr, hop, since = queue.popleft()
         if addr in status:
             continue
-        if classify and not labels.get(addr) and hop > 0 and (found := classify(addr)):
-            labels.add(addr, found[0], found[1], source=AUTO_SOURCE)
-            log.append(f"{addr}: auto-labeled {found[1]} ({found[0]})")
         if labels.is_terminal(addr):
             mark(addr, hop, "terminal")
             continue
         if hop > max_hops:  # recorded as the trail's frontier, never fetched
             mark(addr, hop, "limit")
             continue
-        if len([s for s in status.values() if s in ("expanded", "service")]) >= max_addresses:
+        if fetched >= max_addresses:
             mark(addr, hop, "limit")
             continue
+        # Contract-name lookups cost an API call each, so only addresses about to be fetched get one.
+        if classify and not labels.get(addr) and hop > 0 and (found := classify(addr)):
+            labels.add(addr, found[0], found[1], source=AUTO_SOURCE)
+            log.append(f"{addr}: auto-labeled {found[1]} ({found[0]})")
+            mark(addr, hop, "terminal")
+            continue
+        fetched += 1
 
         raw, truncated = fetch(addr)
         df = clean(pd.concat([normalize(rows, kind) for kind, rows in raw.items()], ignore_index=True), settings)

@@ -21,9 +21,10 @@ import pandas as pd
 from ..processing.preprocess import min_value_for
 from ..scoring.confidence import BAND_ORDER, CATEGORY_HOP
 
-SERVICE_NAMES = {"mixer": "Mixer", "exchange": "Exchange", "bridge": "Bridge", "dex": "DEX pool"}
+SERVICE_NAMES = {"mixer": "Mixer", "exchange": "Exchange", "bridge": "Bridge", "dex": "DEX pool", "recovery": "Recovery wallet"}
 ROLE_ORDER = ["Attacker wallet", "Swap helper", "Distributor", "Mixer depositor", "Exchange depositor",
-              "Bridge user", "Holding wallet", "Pass-through", "Mixer", "Exchange", "Bridge", "DEX pool"]
+              "Bridge user", "Returner", "Holding wallet", "Pass-through", "Mixer", "Exchange", "Bridge", "DEX pool",
+              "Recovery wallet"]
 ROLE_HELP = {
     "Attacker wallet": "Received the stolen funds directly from the exploited contract.",
     "Swap helper": "Mostly sent funds into DEX pools, converting tokens into another asset.",
@@ -31,6 +32,7 @@ ROLE_HELP = {
     "Mixer depositor": "Mostly sent funds into a mixer.",
     "Exchange depositor": "Mostly sent funds to a custodial exchange.",
     "Bridge user": "Mostly sent funds to a cross-chain bridge.",
+    "Returner": "Mostly sent funds back to the victim's recovery wallet.",
     "Holding wallet": "Still holds most of what it received.",
     "Pass-through": "Forwarded funds onward to a single wallet.",
 }
@@ -147,7 +149,8 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
         if out > 0:
             shares = {c: v / out for c, v in out_cat[a].items()}
             for cat_name, role_name in (("dex", "Swap helper"), ("mixer", "Mixer depositor"),
-                                        ("exchange", "Exchange depositor"), ("bridge", "Bridge user")):
+                                        ("exchange", "Exchange depositor"), ("bridge", "Bridge user"),
+                                        ("recovery", "Returner")):
                 if shares.get(cat_name, 0) >= (0.4 if cat_name == "dex" else 0.5):
                     return role_name
             if len(recipients[a]) >= 2:
@@ -230,7 +233,7 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
     endpoints = []
     for a in on_trail:
         cat = category(a)
-        if cat in ("mixer", "exchange", "bridge"):
+        if cat in ("mixer", "exchange", "bridge", "recovery"):
             amount = t_in[a]
         elif cat == "wallet" and residual[a] > max(1000.0, 0.01 * t_in[a]):
             amount = residual[a]
@@ -270,7 +273,7 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
         "low_conf_share": (value_by_band["low"] + value_by_band["very_low"]) / endpoint_total if endpoint_total else None,
     }
 
-    summary = _summary(kpis, value_by_kind, endpoint_total, stages)
+    summary = _summary(kpis, value_by_kind, endpoint_total, stages, len(seeds))
 
     # ---- 9. Chart series -----------------------------------------------------
     activity = defaultdict(lambda: defaultdict(float))
@@ -310,12 +313,13 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
     }
 
 
-def _summary(kpis, value_by_kind, endpoint_total, stages) -> list[str]:
+def _summary(kpis, value_by_kind, endpoint_total, stages, n_seeds: int = 1) -> list[str]:
     """Plain-language findings for the top of the dashboard."""
     out = []
     if kpis["theft_time"] is not None:
         out.append(f"On {kpis['theft_time']:%d %b %Y}, {fmt_usd(kpis['stolen_usd'])} in {kpis['stolen_assets']} assets "
-                   "was drained into a single attacker-controlled wallet.")
+                   + ("was drained into a single attacker-controlled wallet." if n_seeds == 1
+                      else f"was drained into {n_seeds} attacker-controlled wallets."))
     keys = [s["key"] for s in stages]
     steps = [w for k, w in (("conversion", "swapped into ETH"), ("consolidation", "regrouped"),
                             ("distribution", "split across fresh wallets")) if k in keys]
@@ -348,8 +352,8 @@ def _narrative(trail_edges, swap_returns, theft, theft_usd, info, roles, residua
             "key": "theft", "title": "Theft", "start": theft["time"].min(), "end": theft["time"].max(),
             "text": (f"{len(theft)} transfers drained {fmt_usd(theft_usd)} across {len(by_tok)} assets "
                      f"({parts}{', …' if len(by_tok) > 4 else ''}) from {theft['source'].nunique()} contract address(es) "
-                     f"into the attacker wallet {short(next(iter(seeds)))} within "
-                     f"{fmt_span(theft['time'].max() - theft['time'].min())}."),
+                     + (f"into the attacker wallet {short(next(iter(seeds)))}" if len(seeds) == 1 else f"into {len(seeds)} attacker wallets")
+                     + f" within {fmt_span(theft['time'].max() - theft['time'].min())}."),
             "wallets": sorted(seeds), "confidence": [1.0, 1.0], "usd": theft_usd,
         })
 
@@ -418,7 +422,8 @@ def _narrative(trail_edges, swap_returns, theft, theft_usd, info, roles, residua
         })
 
     for cat, title, verb in (("mixer", "Mixing", "deposited into"), ("exchange", "Exchange cash-out", "sent to"),
-                             ("bridge", "Bridge exit", "bridged out via")):
+                             ("bridge", "Bridge exit", "bridged out via"),
+                             ("recovery", "Returned to victim", "returned funds to")):
         rows = [(u, v, d, usd) for u, v, d, usd in trail_edges if category(v) == cat]
         if not rows:
             continue
@@ -432,6 +437,7 @@ def _narrative(trail_edges, swap_returns, theft, theft_usd, info, roles, residua
             "mixer": " A mixer pools deposits from many users, so ownership after this point cannot be established on-chain.",
             "exchange": " Exchanges are custodial; identifying the account holder requires a request to the exchange.",
             "bridge": " The funds leave Ethereum here; following them requires tracing on the destination chain.",
+            "recovery": " This is the victim's published recovery wallet: these funds were given back.",
         }[cat]
         stages.append({
             "key": cat, "title": title, "start": min(times), "end": max(times),
@@ -461,7 +467,7 @@ def _sankey(trail_edges, theft_usd, info, roles, residual, category, display) ->
 
     def group(a):
         cat = category(a)
-        if cat in ("mixer", "exchange", "bridge"):
+        if cat in ("mixer", "exchange", "bridge", "recovery"):
             return display(a)
         if cat == "dex":
             return "DEX pools"

@@ -44,7 +44,13 @@ def write_report(case, scored, patterns, timeline, validation: dict, out_path: s
     for section, metrics in validation.items():
         parts.append(f"### {section.replace('_', ' ').title()}\n")
         for k, v in (metrics or {}).items():
-            parts.append(f"- {k}: {round(v, 4) if isinstance(v, float) else v}")
+            if isinstance(v, dict):
+                parts.append(f"- {k}:")
+                parts.extend(f"  - {sk}: {sv}" for sk, sv in v.items())
+            elif isinstance(v, list) and len(v) > 5:
+                parts.append(f"- {k} ({len(v)}): " + ", ".join(str(x) for x in v))
+            else:
+                parts.append(f"- {k}: {round(v, 4) if isinstance(v, float) else v}")
         parts.append("")
     out_path = Path(out_path)
     out_path.write_text("\n".join(parts), encoding="utf-8")

@@ -5,7 +5,7 @@ Never used for results. Real cases always come from the Etherscan API
 is known in advance, so this file builds one example of each hop type and
 laundering pattern: direct hop, split, DEX swap, fan-out, fan-in mixed with
 clean funds, a peeling chain that is also rapid, a circular transfer, and
-exchange / mixer / bridge exits.
+exchange / mixer / bridge exits, and a return to the victim's recovery wallet.
 """
 
 from __future__ import annotations
@@ -79,10 +79,12 @@ def build_synthetic_case() -> SyntheticCase:
     tx("D", "G", 300, 90); tx("G", "H", 300, 100)
     tx("H", "D", 50, 110)                                 # circular
     tx("H", "Bridge Out", 250, 120)                       # bridge exit
+    tx("E5", "Recovery", 50, 200)                         # returned to the victim
 
     labels = LabelStore()
     for name, cat in [("Uniswap", "dex"), ("Exchange 1", "exchange"), ("Exchange 2", "exchange"),
-                      ("Tornado", "mixer"), ("Bridge Out", "bridge")]:
+                      ("Tornado", "mixer"), ("Bridge Out", "bridge"),
+                      ("Recovery", "recovery")]:
         labels.add(addr(name), name, cat, "test fixture")
 
     gt = pd.DataFrame(
