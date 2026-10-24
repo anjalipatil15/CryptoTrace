@@ -30,11 +30,12 @@ seeds:
   - "0x65760288f19cff476b80a36a61f9dedab16bab49"   # Rari Capital exploiter, ~$3M
 
 # Plus every address the Nomad bridge router paid during the exploit window with at least
-# $100K (293 of 585 recipients, 99.9% of the priced value). On-chain fact; regenerate with
+# $1M: the 32 biggest of 585 recipients, 67% of the priced value. (All 293 with >= $100K gave
+# a trace of 5.3M transfers, too large to analyze.) On-chain fact; regenerate the list with
 # `python scripts/nomad_exploiters.py`.
 seeds_from:
   file: data/ground_truth/nomad_exploiters.csv
-  min_usd: 100000
+  min_usd: 1000000
 
 start_time: 2022-08-01T00:00:00Z
 ground_truth: data/ground_truth/nomad.csv
@@ -42,9 +43,8 @@ ground_truth: data/ground_truth/nomad.csv
 overrides:
   tracing:
     max_hops: 3
-    # Capped at 1,100 (planned 2,000): all seeds and hop 1 are covered; the cap trims hop 2.
-    # Busy bot/service addresses cost ~30 API calls each to classify, so 2,000 took hours.
-    max_addresses: 1100
+    # Busy bot/service addresses cost ~30 API calls each to read, so the trace is kept small.
+    max_addresses: 300
     # Covalent's CQT was one of the main tokens drained from Nomad (Covalent blog, Aug 2022).
     # Its price (prices_usd.CQT) comes from the exploiters' own swaps.
     token_allowlist:

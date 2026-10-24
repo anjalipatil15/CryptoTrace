@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import copy
 import itertools
+import re
+from pathlib import Path
 
 import networkx as nx
 import numpy as np
@@ -101,3 +103,31 @@ def calibrate(g: nx.MultiDiGraph, seeds: list[str], settings: dict, start_time, 
     table = pd.DataFrame(rows)
     table["chosen"] = table["candidate"] == chosen[2]
     return table, chosen[1]
+
+
+def freeze(settings_path: str | Path, chosen: dict) -> list[str]:
+    """Write the chosen hop factors and band cut-offs into settings.yaml, keeping its comments.
+
+    Only values inside the `scoring:` block's `hop_factors:` and `bands:` sections are replaced.
+    Returns the lines that changed, as "key: old -> new".
+    """
+    path = Path(settings_path)
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    targets = {"hop_factors": chosen["scoring"]["hop_factors"], "bands": chosen["scoring"]["bands"]}
+    changed, top, section = [], None, None
+    for i, line in enumerate(lines):
+        if re.match(r"^\S", line):                       # top-level key, e.g. "scoring:"
+            top, section = line.split(":")[0], None
+            continue
+        m = re.match(r"^  (\w+):\s*$", line)               # second-level section, e.g. "  bands:"
+        if m:
+            section = m.group(1)
+            continue
+        m = re.match(r"^(    (\w+):\s*)([0-9.]+)(.*)$", line, re.S)
+        if top == "scoring" and section in targets and m and m.group(2) in targets[section]:
+            new = targets[section][m.group(2)]
+            if float(m.group(3)) != float(new):
+                changed.append(f"{m.group(2)}: {m.group(3)} -> {new:g}")
+                lines[i] = f"{m.group(1)}{new:g}{m.group(4)}"
+    path.write_text("".join(lines), encoding="utf-8")
+    return changed

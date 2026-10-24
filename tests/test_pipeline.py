@@ -134,6 +134,26 @@ def test_band_nudge_only_moves_crowded_cutoffs():
     assert out["lower"] == 0.35 and out["low"] == 0.15                   # nothing nearby: unchanged
 
 
+def test_freeze_rewrites_only_scoring_values(tmp_path):
+    import shutil
+
+    import yaml
+    from cryptotrace.config import DEFAULT_SETTINGS
+    from cryptotrace.validation.calibration import freeze
+
+    path = tmp_path / "settings.yaml"
+    shutil.copy(DEFAULT_SETTINGS, path)
+    before = yaml.safe_load(path.read_text(encoding="utf-8"))
+    chosen = {"scoring": {"hop_factors": {**before["scoring"]["hop_factors"], "direct": 0.95},
+                          "bands": {**before["scoring"]["bands"], "medium": 0.52}}}
+    changed = freeze(path, chosen)
+    after = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert after["scoring"]["hop_factors"]["direct"] == 0.95 and after["scoring"]["bands"]["medium"] == 0.52
+    assert len(changed) == 2 and "# Tornado Cash etc." in path.read_text(encoding="utf-8")
+    after["scoring"] = before["scoring"] = None
+    assert after == before  # nothing outside the scoring block moved
+
+
 def test_calibration_picks_a_candidate(result):
     from cryptotrace.validation.calibration import calibrate
 

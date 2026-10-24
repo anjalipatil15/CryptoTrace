@@ -65,7 +65,8 @@ def cmd_calibrate(args) -> None:
 
     from .graph.builder import build_graph
     from .storage.db import Database
-    from .validation.calibration import calibrate
+    from .config import DEFAULT_SETTINGS
+    from .validation.calibration import calibrate, freeze
     from .validation.metrics import load_ground_truth
 
     case = load_case(args.case)
@@ -82,9 +83,13 @@ def cmd_calibrate(args) -> None:
     cols = ["candidate", "direct", "split", "fan_out", "swap", "band_change_rate", "rank_correlation", "auc_non_seed"]
     print(table.sort_values("band_change_rate")[cols].head(8).round(4).to_string(index=False))
     print(f"\nAll {len(table)} candidates -> {out / 'calibration.csv'}")
-    print("Chosen (copy into config/settings.yaml to freeze):")
-    print(yaml.safe_dump({"scoring": {"hop_factors": best["scoring"]["hop_factors"], "bands": best["scoring"]["bands"]}},
-                         sort_keys=False))
+    chosen = {"scoring": {"hop_factors": best["scoring"]["hop_factors"], "bands": best["scoring"]["bands"]}}
+    if args.freeze:
+        changed = freeze(DEFAULT_SETTINGS, chosen)
+        print(f"Frozen into {DEFAULT_SETTINGS}: " + ("; ".join(changed) if changed else "no change (current values were best)"))
+    else:
+        print("Chosen (run again with --freeze, or copy into config/settings.yaml):")
+        print(yaml.safe_dump(chosen, sort_keys=False))
 
 
 def _theft_source_names(case, transfers, nodes, db) -> dict:
@@ -121,6 +126,7 @@ def main(argv=None) -> None:
     p = sub.add_parser("calibrate", help="tune hop factors for stability on a calibration case (Nomad)")
     p.add_argument("case")
     p.add_argument("--runs", type=int, default=100, help="noise runs per candidate (default 100)")
+    p.add_argument("--freeze", action="store_true", help="write the chosen values into config/settings.yaml")
     p.set_defaults(func=cmd_calibrate)
     args = parser.parse_args(argv)
     args.func(args)

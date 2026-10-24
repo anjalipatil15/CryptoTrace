@@ -18,6 +18,8 @@ cryptotrace trace   config/cases/harmony.yaml       # phases 1-2: Etherscan -> d
 cryptotrace analyze config/cases/harmony.yaml       # phases 3-7: -> outputs/harmony/
 cryptotrace analyze <case> --no-sensitivity         # skip the 500 +/-10% perturbation runs
 cryptotrace calibrate config/cases/nomad.yaml       # robustness calibration -> outputs/nomad/calibration.csv
+cryptotrace calibrate <case> --freeze              # ...and write the chosen values into config/settings.yaml
+powershell -ExecutionPolicy Bypass -File scriptsun_all.ps1   # everything, end to end
 python scripts/nomad_exploiters.py                  # rebuild Nomad seeds/returners from on-chain data
 
 pytest                                              # all tests
@@ -45,11 +47,11 @@ Key concepts that span several modules:
 
 ## Current status
 
-Harmony is finished. Nomad is traced but too large to analyze (2.5M transfers in its graph), so the
-next step is to shrink it (`min_usd: 1000000`, `max_addresses: 300` in `config/cases/nomad.yaml`),
-re-trace, calibrate, freeze the factors in `config/settings.yaml`, re-run both cases and fill in the
-*Pending* parts of `docs/RESULTS.md`. The step-by-step list is [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md);
-follow it in order and explain things to the user in plain language.
+Harmony is built and checked. Nomad is configured as a reduced case (34 seeds, 300 addresses; the
+full 294-seed trace was too large to analyze). What's left: run `scripts/run_all.ps1` (traces both
+cases, `calibrate --freeze` on Nomad, analyzes both), then fill in the *Pending* parts of
+`docs/RESULTS.md` from the two `report.md` files. Steps are in [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md);
+explain things to the user in plain language.
 
 ## Conventions
 

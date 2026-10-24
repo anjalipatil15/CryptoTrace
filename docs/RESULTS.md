@@ -10,9 +10,9 @@ every number here can be regenerated with the commands in the [README](../README
 | Date | 23-24 Jun 2022 | 1-2 Aug 2022 |
 | Stolen | $95.6M in 8 assets (at incident-day prices) | $169.3M excluding CQT; about 113.55M CQT on top (~$11M at $0.10) |
 | Attacker | Lazarus Group (FBI, Jan 2023) | 585 independent addresses |
-| Seeds | 1 wallet, named by Merkle Science and Elliptic | 294: every exploit recipient with >= $100K, plus the five named by rekt.news |
+| Seeds | 1 wallet, named by Merkle Science and Elliptic | 34: the 32 exploit recipients with >= $1M, plus two more named by rekt.news |
 | Ground truth | 55 sourced addresses, 8 documented paths | 46 sourced addresses: 41 recovery-wallet returners, 5 rekt.news addresses |
-| Trace | 45 addresses, 1,205 transfers, max hop 3 | first run: 1,100 addresses, too large to analyze; to be re-run smaller ([NEXT_STEPS.md](NEXT_STEPS.md)) |
+| Trace | 45 addresses, 1,205 transfers, max hop 3 | up to 300 addresses (pending). A first run from all 294 exploiters with >= $100K reached 18,094 addresses and 5.3M transfers, too large to analyze |
 
 ## Harmony
 
@@ -39,7 +39,7 @@ about 6,000 ETH pools. Confidence falls from 1.00 at the attacker wallet to **0.
 - The Nomad ERC-20 bridge router (`0x88a6…30a3`) paid **585 addresses** in **991 transactions** between
   21:32:31 UTC (first exploit transaction) and 00:03:52 UTC (bridge paused). Nobody withdrew between 21:00 and the
   first exploit transaction, so every recipient in the window took exploit funds.
-- 293 recipients took >= $100K each, together 99.9% of the priced value. They are the seeds.
+- 293 recipients took >= $100K each (99.9% of the priced value); the 32 with >= $1M took 67%. Those 32 are the seeds.
 - **41 addresses returned $31.56M** to Nomad's published recovery wallet (`0x94a8…f154`) before 2023 (returns under
   $1,000 are dropped as dust). **4 of them were not paid by the bridge directly**, so a trace from the
   exploiters has to find the path to them. That makes them the independent recall test.
@@ -48,11 +48,11 @@ about 6,000 ETH pools. Confidence falls from 1.00 at the attacker wallet to **0.
 
 ### Results
 
-*Pending: see [NEXT_STEPS.md](NEXT_STEPS.md), steps 1-4.*
+*Pending: run `scripts/run_all.ps1` ([NEXT_STEPS.md](NEXT_STEPS.md)).*
 
 ## Calibration
 
-*Pending: see [NEXT_STEPS.md](NEXT_STEPS.md), step 2.*
+*Pending: run `scripts/run_all.ps1` ([NEXT_STEPS.md](NEXT_STEPS.md)).*
 
 Method (see ARCHITECTURE_REVIEW §4): 81 factor sets (direct, split, fan-out, swap) that keep
 direct > split > fan-out. For each set, band cut-offs are nudged by up to 0.05 away from clusters of

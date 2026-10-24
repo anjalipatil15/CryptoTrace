@@ -68,6 +68,12 @@ The design and its rationale are in [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECT
 
 Requires Python 3.10+ and a free Etherscan API key (https://etherscan.io/myapikey).
 
+**One command:** put `ETHERSCAN_API_KEY=...` in a `.env` file, then run
+`powershell -ExecutionPolicy Bypass -File scriptsun_all.ps1`. It sets up Python, traces both cases,
+calibrates on Nomad, freezes the numbers, analyzes both cases and opens the presentations (about an hour).
+
+Or step by step:
+
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\activate
@@ -78,7 +84,7 @@ copy .env.example .env          # add ETHERSCAN_API_KEY
 ```powershell
 cryptotrace trace     config/cases/harmony.yaml    # collect into data/cryptotrace.db
 cryptotrace analyze   config/cases/harmony.yaml    # score, detect, validate -> outputs/harmony/
-cryptotrace calibrate config/cases/nomad.yaml      # tune factors for robustness (calibration case only)
+cryptotrace calibrate config/cases/nomad.yaml --freeze   # tune factors on Nomad, write them to settings.yaml
 python scripts/nomad_exploiters.py                 # rebuild Nomad's seed and returner lists from on-chain data
 pytest                                             # tests (a hand-built fixture; never used for results)
 ```
