@@ -32,16 +32,16 @@ kind of step it was:
 
 | Step | Number | Why |
 |---|---|---|
-| the wallet paid just one other wallet | × 0.92 | the money clearly went there |
-| the wallet split the money between 2-4 wallets | × 0.80 | the trail branches |
-| it spread the money across 5 or more wallets | × 0.60 | many branches, harder to follow |
-| it swapped tokens (e.g. USDC for ETH) | × 0.90 | different coin, same owner |
+| the wallet paid just one other wallet | × 0.88 | the money clearly went there |
+| the wallet split the money between 2-4 wallets | × 0.85 | the trail branches |
+| it spread the money across 5 or more wallets | × 0.50 | many branches, harder to follow |
+| it swapped tokens (e.g. USDC for ETH) | × 0.85 | different coin, same owner |
 | it sent money to an exchange | × 0.30 | the exchange holds it; only the exchange knows the owner |
 | it sent money to a bridge | × 0.25 | the money left Ethereum |
 | it sent money into a mixer | × 0.05 | the mixer pools money from many users; ownership is lost |
 
 The attacker's own wallet starts at 1.00. Example from Harmony: attacker 1.00 → paid one wallet
-(× 0.92 = 0.92) → that wallet split the money (× 0.80 = 0.74) → it went into Tornado Cash
+(× 0.88 = 0.88) → that wallet split the money (× 0.85 = 0.75) → it went into Tornado Cash
 (× 0.05 = **0.04**). If a wallet can be reached in several ways, it gets its best score. Scores are
 grouped into six labels, from *Very high* to *Very low*.
 
@@ -59,9 +59,9 @@ attacker's wallets for these cases. We check how many of those our trail found o
 whether the documented steps between them are on our trail. We also nudge all the numbers in the
 table up and down by 10%, 500 times, and check whether the scores and labels stay the same.
 
-**Tuning the numbers ("calibration").** The numbers in the table are reasonable starting values.
-We tune them on one case (Nomad) and then test on the other (Harmony) without changing them
-again, so the test is fair.
+**Tuning the numbers ("calibration").** The numbers in the table were tuned on one case (Nomad);
+they started at 0.92 / 0.80 / 0.60 / 0.90. Harmony was then tested without changing them again, so
+the test is fair.
 
 **Output.** For each case: a short presentation, an interactive dashboard, a written report and
 spreadsheets (`outputs/<case>/`).
@@ -112,6 +112,8 @@ Also, "Direct" and "Single Intermediate" are not different patterns. They are
 ```
 confidence(wallet) = max over paths from seed of  product(hop_factor(edge))
 ```
+
+*(Starting values. The values after calibration on Nomad are in the plain-words table above.)*
 
 | Hop type | Factor | Rule |
 |---|---|---|
@@ -236,6 +238,5 @@ Data     scripts/nomad_exploiters.py  Nomad seeds and returners derived from on-
 
 ## 7. Status
 
-Done: ground truth, the Harmony trace and analysis, the Nomad data and the calibration code.
-Left: calibrating on a smaller Nomad case, the final Harmony run with the frozen numbers, and the
-write-up; step by step in [NEXT_STEPS.md](NEXT_STEPS.md). Results so far: [RESULTS.md](RESULTS.md).
+Done: ground truth, both traces, calibration on Nomad, and the held-out Harmony run with the frozen
+numbers. Left: the write-up. Results and findings: [RESULTS.md](RESULTS.md).

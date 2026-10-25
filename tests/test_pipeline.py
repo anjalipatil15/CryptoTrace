@@ -70,10 +70,14 @@ def test_etherscan_reads_history_in_pages(tmp_path):
     assert len(client.transfers("0xabc", "normal")) == 2500 and pages == [1, 2, 3]  # second read is cached
 
 
-def test_seed_is_certain_and_direct_hop_is_very_high(result):
+def test_seed_is_certain_and_direct_hop_keeps_the_direct_factor(result):
+    from cryptotrace.scoring.confidence import band_for
+
+    scoring = load_settings()["scoring"]
     assert conf(result, "Theft") == (1.0, "very_high")
     c, band = conf(result, "A")
-    assert c == pytest.approx(0.92) and band == "very_high"
+    direct = scoring["hop_factors"]["direct"]
+    assert c == pytest.approx(direct) and band == band_for(direct, scoring["bands"])
 
 
 def test_confidence_never_increases_along_best_path(result):
@@ -98,8 +102,10 @@ def test_fan_in_with_clean_funds_is_penalised(result):
     edges = result.edges
     into_f = edges[edges["to_addr"] == addr("F")]
     assert into_f["fan_in"].all()
-    # direct hop (0.92) scaled by fan-in adjustment 0.6 + 0.4 * taint(0.5)
-    assert into_f["factor"].to_numpy() == pytest.approx(0.92 * 0.8)
+    # direct hop scaled by the fan-in adjustment floor + (1 - floor) * taint(0.5)
+    scoring = load_settings()["scoring"]
+    expected = scoring["hop_factors"]["direct"] * (scoring["fan_in_floor"] + (1 - scoring["fan_in_floor"]) * 0.5)
+    assert into_f["factor"].to_numpy() == pytest.approx(expected)
     taint_f = result.scored.set_index("address").loc[addr("F"), "taint_ratio"]
     assert taint_f == pytest.approx(200 / 400)
 

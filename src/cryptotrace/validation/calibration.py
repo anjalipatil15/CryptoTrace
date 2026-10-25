@@ -26,7 +26,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from ..scoring.confidence import score
+from ..scoring.confidence import prepare, score
 from ..scoring.taint import propagate_taint
 from . import metrics
 
@@ -70,17 +70,18 @@ def calibrate(g: nx.MultiDiGraph, seeds: list[str], settings: dict, start_time, 
     work = g.copy()
     seed_set = {s.lower() for s in seeds}
     taint = propagate_taint(work, [s for s in seed_set if s in work], start_time)
+    prepared = prepare(work, settings, taint)  # hop types don't depend on the factors: classify once
     positives = ground_truth[~ground_truth["address"].isin(seed_set)] if not ground_truth.empty else ground_truth
 
     def evaluate(factors: dict, nudge: bool) -> tuple[dict, dict]:
         s = copy.deepcopy(settings)
         s["scoring"]["hop_factors"].update(factors)
-        scored = score(work, seeds, s, start_time, taint=taint)
+        scored = score(work, seeds, s, start_time, prepared=prepared)
         wallets = scored[(scored["category"] == "wallet") & ~scored["address"].isin(seed_set)]
         if nudge:
             s["scoring"]["bands"] = nudge_bands(wallets["confidence"].to_numpy(), s["scoring"]["bands"], band_window)
         s["validation"]["sensitivity_runs"] = runs
-        stab = metrics.sensitivity(work, seeds, s, score, start_time)
+        stab = metrics.sensitivity(work, seeds, s, score, start_time, prepared=prepared)
         auc = metrics.confidence_auc(wallets, positives) if not positives.empty else None
         row = {**factors, **{f"band_{k}": v for k, v in s["scoring"]["bands"].items() if v > 0},
                "auc_non_seed": auc, "band_change_rate": stab.get("band_change_rate_mean"),

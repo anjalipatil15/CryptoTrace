@@ -19,8 +19,7 @@ hops (0.92^2 = 0.85) land in the High band on their own.
 from __future__ import annotations
 
 import math
-from bisect import bisect_left, bisect_right
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import networkx as nx
 import pandas as pd
@@ -39,13 +38,35 @@ def band_for(score: float, bands: dict) -> str:
     return "very_low"
 
 
-def _recipient_index(g: nx.MultiDiGraph) -> dict[str, tuple[list, list]]:
-    """Per sender: on-trail outflows sorted by time, as (timestamps, recipients)."""
+def _window_recipients(g: nx.MultiDiGraph, window: pd.Timedelta) -> dict[tuple, int]:
+    """Per on-trail edge (u, v, key): distinct non-DEX wallets u paid within +/- window of it.
+
+    A sliding window over each sender's outflows in time order. Counting afresh for every edge
+    is quadratic, which bot senders with tens of thousands of transfers make unusable.
+    """
     out = defaultdict(list)
-    for u, v, data in g.edges(data=True):
+    for u, v, k, data in g.edges(keys=True, data=True):
         if data.get("valid") and u != v:
-            out[u].append((data["timestamp"], v))
-    return {u: ([t for t, _ in sorted(rows)], [r for _, r in sorted(rows)]) for u, rows in out.items()}
+            out[u].append((data["timestamp"], v, k))
+    counts: dict[tuple, int] = {}
+    for u, rows in out.items():
+        rows.sort(key=lambda r: r[0])
+        live: Counter = Counter()
+        lo = hi = 0
+        for t, v, k in rows:
+            while hi < len(rows) and rows[hi][0] <= t + window:
+                if g.nodes[rows[hi][1]].get("category") != "dex":
+                    live[rows[hi][1]] += 1
+                hi += 1
+            while rows[lo][0] < t - window:
+                r = rows[lo][1]
+                if r in live:
+                    live[r] -= 1
+                    if not live[r]:
+                        del live[r]
+                lo += 1
+            counts[(u, v, k)] = len(live)
+    return counts
 
 
 def classify_edges(g: nx.MultiDiGraph, settings: dict, taint: dict) -> None:
@@ -55,11 +76,11 @@ def classify_edges(g: nx.MultiDiGraph, settings: dict, taint: dict) -> None:
     pat = settings["patterns"]
     window = pd.Timedelta(hours=pat["window_hours"])
 
-    index = _recipient_index(g)
+    recipients = _window_recipients(g, window)
     # Fan-in counts ALL distinct senders (clean ones too) -- that's what creates ambiguity.
     all_senders = {n: {u for u, _ in g.in_edges(n)} for n in g.nodes}
 
-    for u, v, data in g.edges(data=True):
+    for u, v, k, data in g.edges(keys=True, data=True):
         if not data.get("valid"):
             data.update(hop_type=None, fan_in=False, factor=0.0)
             continue
@@ -67,45 +88,58 @@ def classify_edges(g: nx.MultiDiGraph, settings: dict, taint: dict) -> None:
         if category in CATEGORY_HOP:
             hop_type = CATEGORY_HOP[category]
         else:
-            ts, rec = index.get(u, ([], []))
-            lo, hi = bisect_left(ts, data["timestamp"] - window), bisect_right(ts, data["timestamp"] + window)
-            n_recipients = len({r for r in rec[lo:hi] if g.nodes[r].get("category") != "dex"})
+            n_recipients = recipients.get((u, v, k), 0)
             if n_recipients >= pat["fan_out_min_recipients"]:
                 hop_type = "fan_out"
             elif n_recipients >= pat["split_min_recipients"]:
                 hop_type = "split"
             else:
                 hop_type = "direct"
-        factor = factors[hop_type]
         fan_in = category not in CATEGORY_HOP and len(all_senders[v]) >= pat["fan_in_min_senders"]
-        if fan_in:
-            factor *= floor + (1 - floor) * taint["token_ratio"].get((v, data["token"]), 0.0)
-        data.update(hop_type=hop_type, fan_in=fan_in, factor=factor)
+        mult = floor + (1 - floor) * taint["token_ratio"].get((v, data["token"]), 0.0) if fan_in else 1.0
+        data.update(hop_type=hop_type, fan_in=fan_in, fan_in_mult=mult, factor=factors[hop_type] * mult)
+
+
+def prepare(g: nx.MultiDiGraph, settings: dict, taint: dict) -> dict:
+    """Classify every edge once and keep, per wallet pair, the best fan-in multiplier per hop type.
+
+    Hop types and fan-in multipliers don't depend on the hop factors, so sensitivity and
+    calibration can re-score with new factors from this table instead of re-classifying every
+    transfer (which on Nomad means half a million edges per run).
+    """
+    classify_edges(g, settings, taint)
+    pairs: dict[tuple, dict] = defaultdict(dict)
+    for u, v, data in g.edges(data=True):
+        # Don't route paths *through* terminal services: they end the trail.
+        if data.get("hop_type") is None or u == v or g.nodes[u].get("category") in CATEGORY_HOP:
+            continue
+        opts = pairs[(u, v)]
+        if data["fan_in_mult"] > opts.get(data["hop_type"], -1.0):
+            opts[data["hop_type"]] = data["fan_in_mult"]
+    return {"pairs": dict(pairs), "taint": taint}
 
 
 def score(g: nx.MultiDiGraph, seeds: list[str], settings: dict, start_time: pd.Timestamp | None = None,
-          taint: dict | None = None) -> pd.DataFrame:
+          taint: dict | None = None, prepared: dict | None = None) -> pd.DataFrame:
     """Run taint + classification + max-product path search. Returns one row per on-trail wallet.
 
-    Taint does not depend on the hop factors, so callers that re-score the same graph many
-    times (sensitivity, calibration) can pass it in once.
+    Neither taint nor the hop classification depends on the hop factors, so callers that re-score
+    the same graph many times (sensitivity, calibration) pass `prepared` (from `prepare`) once.
     """
     seeds = [s.lower() for s in seeds if s.lower() in g]
-    if taint is None:
-        taint = propagate_taint(g, seeds, start_time)
-    classify_edges(g, settings, taint)
+    if prepared is None:
+        if taint is None:
+            taint = propagate_taint(g, seeds, start_time)
+        prepared = prepare(g, settings, taint)
+    taint = prepared["taint"]
+    factors = settings["scoring"]["hop_factors"]
 
     # Best (highest) factor per wallet pair; cost = -log(factor).
     best = nx.DiGraph()
-    for u, v, k, data in g.edges(keys=True, data=True):
-        if data.get("factor", 0) > 0 and u != v:
-            if not best.has_edge(u, v) or data["factor"] > best[u][v]["factor"]:
-                best.add_edge(u, v, factor=data["factor"], hop_type=data["hop_type"], key=k,
-                              cost=-math.log(data["factor"]))
-    # Don't route paths *through* terminal services: they end the trail.
-    for n in list(best.nodes):
-        if g.nodes[n].get("category") in CATEGORY_HOP:
-            best.remove_edges_from(list(best.out_edges(n)))
+    for (u, v), opts in prepared["pairs"].items():
+        hop_type, factor = max(((h, factors[h] * m) for h, m in opts.items()), key=lambda x: x[1])
+        if factor > 0:
+            best.add_edge(u, v, factor=factor, hop_type=hop_type, cost=-math.log(factor))
 
     best.add_nodes_from(seeds)
     dist, paths = nx.multi_source_dijkstra(best, set(seeds), weight="cost")

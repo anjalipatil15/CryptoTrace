@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from .._compat import spearman
+from ..scoring.confidence import prepare
 from ..scoring.taint import propagate_taint
 
 # Ground-truth roles starting with this prefix are wallets reached only through a mixer.
@@ -85,13 +86,16 @@ def confidence_auc(scored: pd.DataFrame, gt: pd.DataFrame) -> float | None:
     return float((ranks[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
 
 
-def sensitivity(g: nx.MultiDiGraph, seeds, settings: dict, score_fn, start_time=None) -> dict:
+def sensitivity(g: nx.MultiDiGraph, seeds, settings: dict, score_fn, start_time=None, prepared=None) -> dict:
     """Confidence stability: perturb every hop factor by +/-p and measure how rankings and bands move."""
     cfg = settings["validation"]
     rng = np.random.default_rng(cfg["random_seed"])
-    work = g.copy()  # scoring rewrites edge factors; keep the caller's graph intact
-    taint = propagate_taint(work, [s.lower() for s in seeds if s.lower() in work], start_time)
-    base = score_fn(work, seeds, settings, start_time, taint=taint).set_index("address")
+    work = g
+    if prepared is None:  # classification writes edge attributes; keep the caller's graph intact
+        work = g.copy()
+        taint = propagate_taint(work, [s.lower() for s in seeds if s.lower() in work], start_time)
+        prepared = prepare(work, settings, taint)
+    base = score_fn(work, seeds, settings, start_time, prepared=prepared).set_index("address")
     if base.empty:
         return {"runs": 0}
     corrs, band_changes, abs_changes = [], [], []
@@ -99,7 +103,7 @@ def sensitivity(g: nx.MultiDiGraph, seeds, settings: dict, score_fn, start_time=
         s = copy.deepcopy(settings)
         for k, v in s["scoring"]["hop_factors"].items():
             s["scoring"]["hop_factors"][k] = float(np.clip(v * (1 + rng.uniform(-1, 1) * cfg["sensitivity_perturbation"]), 1e-4, 1.0))
-        run = score_fn(work, seeds, s, start_time, taint=taint).set_index("address").reindex(base.index)
+        run = score_fn(work, seeds, s, start_time, prepared=prepared).set_index("address").reindex(base.index)
         corrs.append(spearman(base["confidence"], run["confidence"].fillna(0)))
         band_changes.append(float((base["band"] != run["band"]).mean()))
         abs_changes.append(float((base["confidence"] - run["confidence"].fillna(0)).abs().mean()))

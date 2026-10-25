@@ -19,7 +19,8 @@ cryptotrace analyze config/cases/harmony.yaml       # phases 3-7: -> outputs/har
 cryptotrace analyze <case> --no-sensitivity         # skip the 500 +/-10% perturbation runs
 cryptotrace calibrate config/cases/nomad.yaml       # robustness calibration -> outputs/nomad/calibration.csv
 cryptotrace calibrate <case> --freeze              # ...and write the chosen values into config/settings.yaml
-powershell -ExecutionPolicy Bypass -File scriptsun_all.ps1   # everything, end to end
+powershell -ExecutionPolicy Bypass -File scripts
+un_all.ps1   # everything, end to end
 python scripts/nomad_exploiters.py                  # rebuild Nomad seeds/returners from on-chain data
 
 pytest                                              # all tests
@@ -47,11 +48,10 @@ Key concepts that span several modules:
 
 ## Current status
 
-Harmony is built and checked. Nomad is configured as a reduced case (34 seeds, 300 addresses; the
-full 294-seed trace was too large to analyze). What's left: run `scripts/run_all.ps1` (traces both
-cases, `calibrate --freeze` on Nomad, analyzes both), then fill in the *Pending* parts of
-`docs/RESULTS.md` from the two `report.md` files. Steps are in [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md);
-explain things to the user in plain language.
+Both cases are traced, Nomad is calibrated, the factors in `config/settings.yaml` are frozen, and
+Harmony was evaluated with them; results are in `docs/RESULTS.md`. Don't change the frozen factors or
+re-tune on Harmony. What's left is the write-up, from `docs/RESULTS.md`
+and `docs/ARCHITECTURE_REVIEW.md`. To reproduce everything, `scripts/run_all.ps1`. Explain things to the user in plain language.
 
 ## Conventions
 

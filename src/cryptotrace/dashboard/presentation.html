@@ -156,7 +156,7 @@ const bandOf = c => BANDS.find(b => c >= D.method.bands[b]) || "very_low";
 const bandDot = b => `<span class="dot" style="background:var(--b-${b})"></span>`;
 const HOP = { direct: "Direct", split: "Split", fan_out: "Fan-out", swap: "DEX swap", mixer: "Mixer", exchange_deposit: "Exchange", bridge: "Bridge", recovery_return: "Returned" };
 const CAPTION = {
-  theft: "Drained into one attacker wallet", conversion: "Tokens swapped to ETH on DEXes", consolidation: "Swapped ETH regrouped",
+  theft: (D.case.seeds || []).length > 1 ? `Drained into ${D.case.seeds.length} attacker wallets` : "Drained into one attacker wallet", conversion: "Tokens swapped to ETH on DEXes", consolidation: "Swapped ETH regrouped",
   distribution: "Split across fresh wallets, often in identical amounts", mixer: "Deposited into a mixer", exchange: "Sent to a custodial exchange",
   bridge: "Bridged off Ethereum", recovery: "Returned to the victim", unresolved: "Still sitting in wallets on the trail",
 };
@@ -250,7 +250,7 @@ function decaySvg() {
   pts.forEach((w, i) => {
     const jx = ((i * 37) % 21 - 10) * 3.2, cx = x(w.hop) + (w.hop ? jx : 0), cy = y(w.confidence);
     if (w.category === "wallet") g += `<circle cx="${cx}" cy="${cy}" r="6" fill="var(--b-${w.band})" stroke="var(--surface)" stroke-width="1.5"><title>${esc(w.name)}: ${w.confidence.toFixed(2)}</title></circle>`;
-    else g += `<path d="M${cx},${cy - 9} L${cx + 9},${cy + 7} L${cx - 9},${cy + 7} Z" fill="var(--warn)"><title>${esc(w.name)}: ${w.confidence.toFixed(3)}</title></path><text x="${cx - 14}" y="${cy - 14}" text-anchor="end" style="fill:var(--text);font-weight:600">${esc(w.name)} · ${w.confidence.toFixed(2)}</text>`;
+    else g += `<path d="M${cx},${cy - 9} L${cx + 9},${cy + 7} L${cx - 9},${cy + 7} Z" fill="var(--warn)"><title>${esc(w.name)}: ${w.confidence.toFixed(3)}</title></path><text x="${cx - 14}" y="${cy - 14}" text-anchor="end" style="fill:var(--text);font-weight:600">${esc(w.name.replace(/\s*\(.*\)\s*$/, ""))} · ${w.confidence.toFixed(2)}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Confidence by hop distance">${g}</svg>`;
 }

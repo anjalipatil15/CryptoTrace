@@ -13,9 +13,9 @@ It is applied to two real cases:
 | Case | Role | Stolen | Result |
 |---|---|---|---|
 | **Harmony Horizon Bridge** (Jun 2022, Lazarus Group) | evaluation, held out | $95.6M | 11/11 publicly named pre-mixer wallets found, 16/16 documented hops rebuilt; confidence falls from 1.00 to 0.04 at Tornado Cash |
-| **Nomad Bridge** (Aug 2022, 585 exploiters) | calibration | about $180M (incl. CQT at $0.10) | factors calibrated for robustness on this case |
+| **Nomad Bridge** (Aug 2022, 585 exploiters) | calibration | about $180M (incl. CQT at $0.10) | calibration halved how often scores change label under noise (17.7% to 8.9%); known wallets ranked near the top (AUC 0.99) |
 
-Full results and findings: [docs/RESULTS.md](docs/RESULTS.md). What's left to do: [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
+Full results, findings and sources: [docs/RESULTS.md](docs/RESULTS.md).
 New to the project? Start with the plain-language pipeline in [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md).
 
 ## How it works
@@ -40,16 +40,17 @@ seed wallet(s) ──► 1. collect ──► 2. clean ──► 3. graph ──
 
    | Hop type | Factor | Rule |
    |---|---|---|
-   | direct | 0.92 | the sender paid one wallet in the 24 h window |
-   | split | 0.80 | the sender paid 2-4 wallets |
-   | fan-out | 0.60 | the sender paid 5 or more wallets |
-   | swap | 0.90 | the receiver is a DEX (the asset changes, the owner doesn't) |
+   | direct | 0.88 | the sender paid one wallet in the 24 h window |
+   | split | 0.85 | the sender paid 2-4 wallets |
+   | fan-out | 0.50 | the sender paid 5 or more wallets |
+   | swap | 0.85 | the receiver is a DEX (the asset changes, the owner doesn't) |
    | exchange deposit | 0.30 | custodial exchange; the trail ends |
    | bridge | 0.25 | leaves Ethereum; the trail ends |
    | mixer | 0.05 | Tornado Cash etc.; the trail ends |
    | returned | 0.92 | the victim's recovery wallet; the trail ends |
 
-   Example from Harmony: attacker 1.00 × 0.92 (direct) × 0.80 (split) × 0.05 (mixer) = **0.04**.
+   These are the values after calibration on Nomad (they started at 0.92 / 0.80 / 0.60 / 0.90).
+   Example from Harmony: attacker 1.00 × 0.88 (direct) × 0.85 (split) × 0.05 (mixer) = **0.04**.
    Scores map to six bands, from *Very high* to *Very low*. A second metric, **taint**, tracks what share of
    a wallet's funds is stolen (haircut method, in time order). It lowers the score of wallets that mix
    stolen funds with clean money.
@@ -69,7 +70,8 @@ The design and its rationale are in [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECT
 Requires Python 3.10+ and a free Etherscan API key (https://etherscan.io/myapikey).
 
 **One command:** put `ETHERSCAN_API_KEY=...` in a `.env` file, then run
-`powershell -ExecutionPolicy Bypass -File scriptsun_all.ps1`. It sets up Python, traces both cases,
+`powershell -ExecutionPolicy Bypass -File scripts
+un_all.ps1`. It sets up Python, traces both cases,
 calibrates on Nomad, freezes the numbers, analyzes both cases and opens the presentations (about an hour).
 
 Or step by step:

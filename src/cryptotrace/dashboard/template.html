@@ -280,7 +280,7 @@ footer { padding: 48px 0 40px; color: var(--muted); font-size: 12.5px; }
 
   <section class="block" id="timeline">
     <div class="sec-head"><div><h2>Activity over time</h2>
-      <p>Daily value moved along the trail, coloured by the type of hop. The gap between the theft and the mixing shows how long the attacker waited.</p></div></div>
+      <p>Value moved along the trail <span id="activity-bin">per day</span>, coloured by the type of hop. The gap between the theft and the mixing shows how long the attacker waited.</p></div></div>
     <div class="card"><div class="chart" id="chart-activity" style="height:320px"></div></div>
     <div class="card" style="margin-top:16px"><h3>Key events</h3><ul class="events" id="events"></ul></div>
   </section>
@@ -390,12 +390,14 @@ function renderOverview() {
   const chips = [];
   if (c.date) chips.push(`<span class="chip">Incident <b>${esc(when(c.date, false))}</b></span>`);
   if (c.attribution) chips.push(`<span class="chip">Attribution <b>${esc(c.attribution)}</b></span>`);
-  c.seeds.forEach(s => chips.push(`<span class="chip">Attacker wallet ${addrLink(s)}</span>`));
+  if (c.seeds.length > 3) chips.push(`<span class="chip">Attacker wallets <b>${c.seeds.length}</b></span>`);
+  else c.seeds.forEach(s => chips.push(`<span class="chip">Attacker wallet ${addrLink(s)}</span>`));
   $('#case-chips').innerHTML = chips.join('');
   $('#case-desc').textContent = c.description;
   const tiles = [
     ['Stolen', usd(k.stolen_usd), `${k.stolen_assets} assets`],
-    ['Traced to a destination', usd(k.traced_usd), k.traced_share != null ? pct(Math.min(k.traced_share, 1)) + ' of stolen value' : ''],
+    ['Traced to a destination', usd(k.traced_usd), k.traced_share == null ? '' : k.traced_share > 1.05
+      ? 'more than was stolen: funds that loop back are counted at each endpoint they reach' : pct(Math.min(k.traced_share, 1)) + ' of stolen value'],
     ['Reached a mixer', usd(k.mixer_usd), `${num(k.mixer_deposits)} deposits`],
     ['Theft to first mixer deposit', k.time_to_mixer || '–', k.first_mixer ? when(k.first_mixer, false) : 'no mixer reached'],
     ['Wallets on the trail', num(k.wallets), `${k.max_hop} hops · ${k.services} services`],
@@ -517,14 +519,18 @@ function renderCharts() {
 
   /* activity */
   const types = Object.keys(HOP_LABEL).filter(t => D.activity.some(r => r[t]));
+  const bin = D.activity_bin || 'day';
+  $('#activity-bin').textContent = 'per ' + bin;
+  const binLabel = v => bin === 'day' ? when(v, false) : bin === 'week' ? 'Week of ' + when(v, false)
+    : new Date(v).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   chart('chart-activity').setOption(Object.assign(base(), {
     grid: { left: 58, right: 16, top: 40, bottom: 30 },
     legend: { top: 0, left: 0, itemWidth: 12, itemHeight: 12, textStyle: { color: css('--text-2'), fontSize: 12 } },
-    tooltip: Object.assign(base().tooltip, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => `<b>${when(ps[0].value[0], false)}</b><br>` + ps.filter(p => p.value[1]).map(p => `${p.marker}${p.seriesName}: ${usd(p.value[1])}`).join('<br>') }),
+    tooltip: Object.assign(base().tooltip, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => `<b>${binLabel(ps[0].value[0])}</b><br>` + ps.filter(p => p.value[1]).map(p => `${p.marker}${p.seriesName}: ${usd(p.value[1])}`).join('<br>') }),
     xAxis: axis({ type: 'time', splitLine: { show: false } }),
     yAxis: axis({ type: 'value', axisLabel: { color: css('--muted'), formatter: v => usd(v) } }),
     series: types.map(t => ({ name: HOP_LABEL[t], type: 'bar', stack: 'a', barMaxWidth: 26, data: D.activity.map(r => [r.day, r[t] || 0]),
-      itemStyle: { color: hopColor(t), borderColor: css('--surface'), borderWidth: 1 } })),
+      itemStyle: { color: hopColor(t), borderColor: css('--surface'), borderWidth: D.activity.length > 60 ? 0 : 1 } })),
   }));
 }
 window.addEventListener('resize', () => Object.values(charts).forEach(c => c.resize()));

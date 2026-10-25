@@ -8,29 +8,32 @@ every number here can be regenerated with the commands in the [README](../README
 | | Harmony Horizon Bridge (evaluation, held out) | Nomad Bridge (calibration) |
 |---|---|---|
 | Date | 23-24 Jun 2022 | 1-2 Aug 2022 |
-| Stolen | $95.6M in 8 assets (at incident-day prices) | $169.3M excluding CQT; about 113.55M CQT on top (~$11M at $0.10) |
+| Stolen | $95.6M in 8 assets (at incident-day prices) | $169.3M excluding CQT across all 585 exploiters; $109.7M (7 assets) into the 34 seeds |
 | Attacker | Lazarus Group (FBI, Jan 2023) | 585 independent addresses |
 | Seeds | 1 wallet, named by Merkle Science and Elliptic | 34: the 32 exploit recipients with >= $1M, plus two more named by rekt.news |
 | Ground truth | 55 sourced addresses, 8 documented paths | 46 sourced addresses: 41 recovery-wallet returners, 5 rekt.news addresses |
-| Trace | 45 addresses, 1,205 transfers, max hop 3 | up to 300 addresses (pending). A first run from all 294 exploiters with >= $100K reached 18,094 addresses and 5.3M transfers, too large to analyze |
+| Trace | 45 addresses, 1,205 transfers, max hop 3 | 300 addresses read, 1,957 reached, 1,952 scored, max hop 4. A first run from all 294 exploiters with >= $100K reached 18,094 addresses and 5.3M transfers, too large to analyze |
 
 ## Harmony
 
-*Uncalibrated factors, 500 noise runs. Final numbers after freezing the calibrated factors: pending.*
+Held-out evaluation with the numbers frozen after calibrating on Nomad (500 noise runs). The
+uncalibrated run is shown for comparison.
 
-| Metric | Value | Meaning |
-|---|---|---|
-| In-scope recall (wallets before the mixer) | **11 / 11** | Every publicly named pre-mixer wallet is on the trail |
-| Trace completeness | **16 / 16 steps** | Every documented hop is rebuilt |
-| Overall recall | 11 / 55 | The other 44 are post-mixer wallets (Railgun withdrawals, Circle-blacklisted, laundering contracts). Expected: tracing stops at mixers |
-| Precision (lower bound) | 24% | The denominator includes the 22 service endpoints |
-| Calibration AUC | 0.51 (0.58 on wallets only) | See finding 1 |
-| Rank stability under ±10% factor noise | ρ = 0.92 mean | Rankings hold |
-| Band change rate | 27% | Bands are fragile near their cut-offs (finding 5) |
+| Metric | Frozen (final) | Uncalibrated | Meaning |
+|---|---|---|---|
+| In-scope recall (wallets before the mixer) | **11 / 11** | 11 / 11 | Every publicly named pre-mixer wallet is on the trail |
+| Trace completeness | **16 / 16 steps** | 16 / 16 | Every documented hop is rebuilt |
+| Overall recall | 11 / 55 | 11 / 55 | The other 44 are post-mixer wallets (Railgun withdrawals, Circle-blacklisted, laundering contracts). Expected: tracing stops at mixers |
+| Precision (lower bound) | 24% | 24% | The denominator includes the 22 service endpoints |
+| AUC (all / wallets only) | 0.57 / 0.58 | 0.51 / 0.58 | See finding 1 |
+| Rank stability under ±10% noise | ρ = **0.67** | 0.92 | See finding 9 |
+| Band change rate | **35%** | 27% | See findings 5 and 9 |
+| Bands | 1 very high, 11 high, 32 medium, 1 very low | 2 / 7 / 35 / 0 / 0 / 1 | |
 
 The reconstruction matches Elliptic's independent analysis: **14 depositor wallets and 857
 deposits of exactly 100 ETH** into Tornado Cash, after the seed split its funds into 18,036 ETH pools and then
-about 6,000 ETH pools. Confidence falls from 1.00 at the attacker wallet to **0.04** at the Tornado Cash Router.
+about 6,000 ETH pools. Confidence falls from 1.00 at the attacker wallet to **0.04** at the Tornado Cash Router
+(1.00 × 0.88 direct × 0.85 split × 0.05 mixer).
 
 ## Nomad
 
@@ -46,13 +49,35 @@ about 6,000 ETH pools. Confidence falls from 1.00 at the attacker wallet to **0.
 - Some recipients are bot contracts that forward to a wallet: `0xbf29…` (~$40M per rekt.news) was paid
   through helper contracts that each passed on exactly 202,440 USDC.
 
-### Results
+### Results (frozen numbers)
 
-*Pending: run `scripts/run_all.ps1` ([NEXT_STEPS.md](NEXT_STEPS.md)).*
+| Metric | Value | Meaning |
+|---|---|---|
+| Stolen into the seeds | $109.7M in 7 assets, 154 transfers within 2.3 hours | from the bridge router only (`theft_sources` in the case file) |
+| Trail | 1,952 wallets and services scored, up to hop 4 | |
+| Time to first mixer deposit | 2.7 hours | 367 deposits, $46.3M, into Tornado Cash |
+| Returned to Nomad | $19.4M from 9 wallets on the trail | the "returned" hop |
+| Known wallets found | 13 / 45 | all 5 rekt.news addresses; 8 of 36 direct returners; **0 of 4 indirect returners** |
+| AUC (all / wallets only) | 0.986 / 0.991 | known wallets score well above the rest |
+| Rank stability under ±10% noise | ρ = 0.99 (min 0.95) | |
+| Band change rate | 9% | |
+| Patterns | 743 | 312 rapid movement, 156 fan-in, 114 circular, 90 peeling chains, 71 fan-out |
+
+Most of the 36 returners the bridge paid directly are not on the trail because they took less than $1M
+and are not seeds. The 4 indirect returners are not reached within the 300-address limit.
 
 ## Calibration
 
-*Pending: run `scripts/run_all.ps1` ([NEXT_STEPS.md](NEXT_STEPS.md)).*
+`cryptotrace calibrate config/cases/nomad.yaml --freeze`, 100 noise runs per candidate:
+
+| | direct | split | fan-out | swap | Very high | High | Medium | Lower | Low | Band change (Nomad) | ρ (Nomad) | AUC (Nomad) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| before | 0.92 | 0.80 | 0.60 | 0.90 | 0.90 | 0.75 | 0.55 | 0.35 | 0.15 | 17.7% | 0.980 | 0.974 |
+| **chosen** | **0.88** | **0.85** | **0.50** | **0.85** | **0.93** | **0.735** | **0.59** | **0.37** | **0.11** | **8.9%** | **0.991** | **0.971** |
+
+On Nomad, calibration halves the band-change rate. Exchange (0.30), bridge (0.25), mixer (0.05) and
+returned (0.92) are not tuned. Because the Very high cut-off (0.93) is now above a direct hop (0.88), only
+the attacker wallets themselves are Very high.
 
 Method (see ARCHITECTURE_REVIEW §4): 81 factor sets (direct, split, fan-out, swap) that keep
 direct > split > fan-out. For each set, band cut-offs are nudged by up to 0.05 away from clusters of
@@ -66,8 +91,9 @@ the known Nomad wallets by more than 0.02. All candidates are written to `output
    (18,036 ETH pools, then about 6,000 ETH splits, then 100 ETH Tornado deposits). Elliptic counts 14 depositor wallets;
    Merkle Science names 6. The unnamed ones count as negatives and pull the AUC down. AUC needs known-clean
    wallets to mean anything.
-2. **DEX pools (0.72) score higher than confirmed Tornado depositors (0.64).** The swap factor is high because a
-   swap doesn't change the owner, but the pool itself is not an attacker wallet. Report AUC on wallets only.
+2. **DEX pools score as high as confirmed attacker wallets.** Uncalibrated, pools (0.72) outranked the confirmed
+   Tornado depositors (0.64); with the frozen numbers both score 0.72. The pool itself is not an attacker wallet,
+   so AUC is also reported on wallets only.
 3. **Merkle Science misprints H8's address** (it repeats H7's). On-chain, the second 18,036 ETH recipient that
    funded H9-H11 is `0x809dc735e80be1578ad4fe04a30aa6b7e280c5e4`; the amounts match both Merkle and Elliptic.
 4. **The attribution horizon is the mixer.** Everything after Tornado Cash (the January 2023 Railgun round, the
@@ -75,6 +101,16 @@ the known Nomad wallets by more than 0.02. All candidates are written to `output
 5. **Bands are fragile; rankings are not.** Under ±10% noise ρ stays at 0.92 while 27% of wallets change band.
    Scores cluster at products like 0.736 and 0.64, and a cut-off that sits inside a cluster flips all of it.
    With 50 runs this estimate moved between 25% and 31%, so 500 runs are used.
+9. **Stability tuned on one case does not carry over to the other.** Calibration halved Nomad's band-change rate
+   (17.7% → 8.9%) but made Harmony's worse (27% → 35%, ρ 0.92 → 0.67). With the chosen numbers a direct hop (0.88)
+   and a split (0.85) are nearly equal, so noise reorders wallets; and most Harmony wallets score 0.722 or 0.748,
+   either side of the new High cut-off (0.735). The cut-offs were placed between Nomad's score clusters, which sit
+   elsewhere. Recall and completeness are unaffected. Tuning again on Harmony would defeat the held-out test, so
+   this is reported as the result: band cut-offs are case-specific.
+10. **Bot-heavy cases need bounds.** On Nomad, the loop detector first found 1.86 million circular transfers among
+   bots and busy services at the trail's edge (a 1 GB dashboard). It now only looks at followed wallets, capped at 500.
+11. **Seeds that are bots need a named theft source.** Without one, years of the bots' unrelated income counted
+   as stolen. The case now names the Nomad bridge router as the only theft source.
 6. **The largest Nomad exploiters never moved most of the funds.** `0x56d8…` (~$47M) still holds 37.5M CQT and about
    10,200 WETH; `0xbf29…` (~$40M) never moved its 38.7M USDC. A shallow trail can mean the money stayed put.
 7. **Etherscan returns at most 1,000 rows per call.** The first version read one call per address, which silently
@@ -86,8 +122,14 @@ the known Nomad wallets by more than 0.02. All candidates are written to `output
 ## Limitations
 
 - Ground truth is partial on both cases, so precision is a lower bound and AUC is weak (finding 1).
-- Nomad is analyzed on a reduced case (the biggest exploiters, 300 traced addresses): the full trace from 294
+- Nomad is analyzed on a reduced case (the 34 biggest exploiters, 300 read addresses): the full trace from 294
   exploiters reached 18,094 addresses and 5.3M transfers, mostly the histories of bots and busy services.
+- Nomad's case starts at midnight on 1 Aug 2022, but the exploit began at 21:32 UTC. Many seeds are bots that
+  were active earlier that day, so some of their morning transfers count as moving stolen funds; this is why the
+  dashboard lists distribution and conversion events before the theft. Starting the case at 21:32 and
+  re-running `calibrate --freeze` and `analyze` would fix it (about 20 minutes).
+- On Nomad, money that loops back up the trail is counted at each endpoint it reaches, so "traced to a destination"
+  ($252M) exceeds the amount stolen ($110M).
 - CQT is priced at $0.10, from the exploiters' first sales on 1 Aug 2022 ($0.086-0.108). Their dumping later
   pushed it to $0.03-0.06, so any single price for CQT is approximate.
 - Prices are single reference prices per case, so USD totals are approximate.

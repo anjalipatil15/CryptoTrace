@@ -105,9 +105,13 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
         return ent or names.get(a) or short(a)
 
     # ---- 1. Theft: inflows into the seed from outside the trail ------------------
+    # A case can name the exploited contract(s); otherwise any outside inflow after start_time
+    # counts. Naming them matters when seeds are bots with long histories of unrelated income.
+    theft_sources = {a.lower() for a in (getattr(case, "extra", None) or {}).get("theft_sources") or []}
     theft_rows = []
     for u, v, d in g.edges(data=True):
-        if v in seeds and u not in on_trail and d["value"] >= max(min_value_for(d["token"], settings), 1e-9) \
+        from_outside = u in theft_sources if theft_sources else u not in on_trail  # named sources may be on the trail too
+        if v in seeds and from_outside and d["value"] >= max(min_value_for(d["token"], settings), 1e-9) \
                 and (case.start_time is None or d["timestamp"] >= case.start_time):
             theft_rows.append({"source": u, "target": v, "token": d["token"], "amount": d["value"],
                                "usd": price(d["token"], d["value"]), "time": d["timestamp"], "tx": d["tx_hash"]})
@@ -276,9 +280,19 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
     summary = _summary(kpis, value_by_kind, endpoint_total, stages, len(seeds))
 
     # ---- 9. Chart series -----------------------------------------------------
+    # Daily bars for short cases; weekly / monthly when the trail runs for months or years,
+    # otherwise each bar is narrower than a pixel.
+    times = [d["timestamp"] for _, _, d, _ in trail_edges]
+    span = (max(times) - min(times)) if times else pd.Timedelta(0)
+    activity_bin = "day" if span <= pd.Timedelta(days=90) else "week" if span <= pd.Timedelta(days=730) else "month"
+    period = {"day": "D", "week": "W", "month": "M"}[activity_bin]
+
+    def bin_start(ts):
+        return ts.tz_convert(None).to_period(period).start_time.tz_localize("UTC")
+
     activity = defaultdict(lambda: defaultdict(float))
     for u, v, d, usd in trail_edges:
-        activity[d["timestamp"].floor("D")][d.get("hop_type") or "other"] += usd
+        activity[bin_start(d["timestamp"])][d.get("hop_type") or "other"] += usd
     activity_rows = [{"day": day, **vals} for day, vals in sorted(activity.items())]
 
     return {
@@ -303,6 +317,7 @@ def build_insights(g: nx.MultiDiGraph, scored: pd.DataFrame, patterns: pd.DataFr
         "value_by_band": value_by_band,
         "value_by_kind": dict(value_by_kind),
         "activity": activity_rows,
+        "activity_bin": activity_bin,
         "sankey": _sankey(trail_edges, theft_usd, info, roles, residual, category, display),
         "roles": {r: ROLE_HELP.get(r, "") for r in ROLE_ORDER},
         "method": {"hop_factors": factors, "bands": settings["scoring"]["bands"],
@@ -405,10 +420,12 @@ def _narrative(trail_edges, swap_returns, theft, theft_usd, info, roles, residua
         for hop in sorted(tiers):
             rows = tiers[hop]
             senders, receivers = {u for u, *_ in rows}, {v for _, v, *_ in rows}
-            amounts = Counter(round(d["tainted_value"], 1) for _, _, d, _ in rows)
-            common, n_common = amounts.most_common(1)[0]
+            # identical amounts among transfers that carried stolen funds (0 would match every clean one)
+            amounts = Counter(round(d["tainted_value"], 1) for _, _, d, _ in rows if d["tainted_value"] >= 1)
+            common, n_common = amounts.most_common(1)[0] if amounts else (0, 0)
             tok = rows[0][2]["token"]
-            who = "the attacker wallet" if senders <= seeds else f"{len(senders)} wallets"
+            who = (("the attacker wallet" if len(seeds) == 1 else "the attacker wallets") if senders <= seeds
+                   else f"{len(senders)} wallets")
             parts.append(f"{who} split {fmt_usd(sum(r[3] for r in rows))} into {len(receivers)} wallets"
                          + (f" ({n_common} identical transfers of {common:,.0f} {tok})" if n_common > 2 else ""))
             tier_usd.append(sum(r[3] for r in rows))

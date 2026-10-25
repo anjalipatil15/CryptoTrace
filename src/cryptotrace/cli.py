@@ -97,12 +97,14 @@ def _theft_source_names(case, transfers, nodes, db) -> dict:
     from .collection.etherscan import EtherscanClient
 
     traced = set(nodes["address"]) if not nodes.empty else set()
-    sources = set(transfers.loc[transfers["to_addr"].isin(case.seeds) & ~transfers["from_addr"].isin(traced), "from_addr"])
+    named = {a.lower() for a in case.extra.get("theft_sources") or []}  # exploited contracts named in the case
+    sources = named or set(transfers.loc[transfers["to_addr"].isin(case.seeds) & ~transfers["from_addr"].isin(traced), "from_addr"])
+    names = {a.lower(): n for a, n in (case.extra.get("theft_source_names") or {}).items()}  # names given in the case file
+    sources -= set(names)
     try:
         client = EtherscanClient(etherscan_api_key(), case.settings, db)
     except RuntimeError:
-        return {}
-    names = {}
+        return names
     for a in sorted(sources):
         try:
             if name := client.contract_name(a):

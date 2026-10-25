@@ -50,10 +50,10 @@ scoring:
   # Per-hop multiplicative confidence factors. Path confidence = product of
   # factors along the best path from the seed (max-product path).
   hop_factors:
-    direct: 0.92            # sender has a single recipient in the window
-    split: 0.80             # sender pays 2..(fan_out_min_recipients-1) recipients
-    fan_out: 0.60           # sender pays >= fan_out_min_recipients recipients
-    swap: 0.90              # sent to a DEX router/pool (asset converts, owner unchanged)
+    direct: 0.88            # sender has a single recipient in the window
+    split: 0.85             # sender pays 2..(fan_out_min_recipients-1) recipients
+    fan_out: 0.5           # sender pays >= fan_out_min_recipients recipients
+    swap: 0.85              # sent to a DEX router/pool (asset converts, owner unchanged)
     exchange_deposit: 0.30  # custodial: ownership after deposit is unknowable on-chain
     bridge: 0.25            # leaves the chain (cross-chain out of scope)
     mixer: 0.05             # Tornado Cash etc.
@@ -64,11 +64,11 @@ scoring:
   fan_in_floor: 0.60
   # Confidence bands (lower bound, inclusive), mapping back to the proposal's labels.
   bands:
-    very_high: 0.90
-    high: 0.75
-    medium: 0.55
-    lower: 0.35
-    low: 0.15
+    very_high: 0.93
+    high: 0.735
+    medium: 0.59
+    lower: 0.37
+    low: 0.11
     very_low: 0.0
 
 patterns:
@@ -80,6 +80,7 @@ patterns:
   peeling_main_share: 0.70    # forwarded share of outflow that counts as the "main" branch
   rapid_max_gap_minutes: 30   # wallet forwards funds within this long of receiving them
   circular_max_length: 6
+  circular_max_cycles: 500    # safety cap: bot-heavy cases can contain millions of loops
 
 validation:
   sensitivity_runs: 500             # 50 runs gave band-change rates that moved by 6 points between seeds

@@ -119,13 +119,20 @@ def detect_rapid_movement(g, settings) -> list[dict]:
 
 def detect_circular(g, settings) -> list[dict]:
     cfg = settings["patterns"]
+    # Only wallets the trace followed (and seeds): bots and busy services at the trail's edge
+    # form millions of short loops among themselves that say nothing about the theft.
+    followed = {n for n, a in g.nodes(data=True) if a.get("status") == "expanded"}
+    followed = followed or set(g.nodes)  # graphs built without trace state (tests) keep every node
     d = nx.DiGraph()
     first = {}
     for u, v, data in _trail_edges(g):
-        d.add_edge(u, v)
-        first.setdefault((u, v), data["timestamp"])
+        if u in followed and v in followed:
+            d.add_edge(u, v)
+            first.setdefault((u, v), data["timestamp"])
     rows = []
     for cycle in nx.simple_cycles(d, length_bound=cfg["circular_max_length"]):
+        if len(rows) >= cfg.get("circular_max_cycles", 500):
+            break
         if len(cycle) < 2 or any(g.nodes[n].get("category") == "dex" for n in cycle):
             continue  # wallet -> DEX -> wallet is a swap, not a circular transfer
         times = [first[(a, b)] for a, b in zip(cycle, cycle[1:] + cycle[:1])]

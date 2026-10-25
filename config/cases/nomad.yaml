@@ -37,6 +37,15 @@ seeds_from:
   file: data/ground_truth/nomad_exploiters.csv
   min_usd: 1000000
 
+# The exploited contract: only what it paid the seeds counts as stolen (many seeds are bots
+# with years of unrelated income).
+theft_sources:
+  - "0x88a69b4e698a4b090df6cf5bd7b2d47325ad30a3"   # Nomad ERC-20 bridge router
+theft_source_names:
+  "0x88a69b4e698a4b090df6cf5bd7b2d47325ad30a3": Nomad ERC-20 bridge router
+
+# Known issue: the exploit began at 21:32:31 UTC. Many seeds are bots that were active earlier that
+# day, so starting at midnight counts their morning transfers as moving stolen funds (see RESULTS.md).
 start_time: 2022-08-01T00:00:00Z
 ground_truth: data/ground_truth/nomad.csv
 
