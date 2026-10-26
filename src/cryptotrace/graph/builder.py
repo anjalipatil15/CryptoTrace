@@ -43,18 +43,3 @@ def build_graph(transfers: pd.DataFrame, labels: LabelStore, nodes: pd.DataFrame
             trace_hop=state.get("hop"),
         )
     return g
-
-
-def collapse(g: nx.MultiDiGraph) -> nx.DiGraph:
-    """Simple DiGraph: one edge per wallet pair with count / first & last timestamp."""
-    d = nx.DiGraph()
-    d.add_nodes_from(g.nodes(data=True))
-    for u, v, data in g.edges(data=True):
-        if d.has_edge(u, v):
-            e = d[u][v]
-            e["count"] += 1
-            e["first_ts"] = min(e["first_ts"], data["timestamp"])
-            e["last_ts"] = max(e["last_ts"], data["timestamp"])
-        else:
-            d.add_edge(u, v, count=1, first_ts=data["timestamp"], last_ts=data["timestamp"])
-    return d

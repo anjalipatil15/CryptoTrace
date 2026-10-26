@@ -70,8 +70,7 @@ The design and its rationale are in [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECT
 Requires Python 3.10+ and a free Etherscan API key (https://etherscan.io/myapikey).
 
 **One command:** put `ETHERSCAN_API_KEY=...` in a `.env` file, then run
-`powershell -ExecutionPolicy Bypass -File scripts
-un_all.ps1`. It sets up Python, traces both cases,
+`powershell -ExecutionPolicy Bypass -File scripts\run_all.ps1`. It sets up Python, traces both cases,
 calibrates on Nomad, freezes the numbers, analyzes both cases and opens the presentations (about an hour).
 
 Or step by step:

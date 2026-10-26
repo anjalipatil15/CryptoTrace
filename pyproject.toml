@@ -18,8 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-rpc = ["web3>=6.15"]
-dev = ["pytest>=8.0", "jupyter>=1.0"]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 cryptotrace = "cryptotrace.cli:main"

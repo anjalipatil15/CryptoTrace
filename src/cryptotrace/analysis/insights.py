@@ -19,7 +19,7 @@ import networkx as nx
 import pandas as pd
 
 from ..processing.preprocess import min_value_for
-from ..scoring.confidence import BAND_ORDER, CATEGORY_HOP
+from ..scoring.confidence import BAND_ORDER
 
 SERVICE_NAMES = {"mixer": "Mixer", "exchange": "Exchange", "bridge": "Bridge", "dex": "DEX pool", "recovery": "Recovery wallet"}
 ROLE_ORDER = ["Attacker wallet", "Swap helper", "Distributor", "Mixer depositor", "Exchange depositor",
